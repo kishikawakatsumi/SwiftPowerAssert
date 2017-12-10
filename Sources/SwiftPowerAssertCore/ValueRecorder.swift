@@ -136,10 +136,17 @@ final class ValueRecorder {
             }
 
             switch token.tokenKind {
-            case .stringLiteral(_), .integerLiteral(_), .floatingLiteral(_):
-                continue
-            case .trueKeyword, .falseKeyword:
-                continue
+            case .stringLiteral(_), .integerLiteral(_), .floatingLiteral(_), .trueKeyword, .falseKeyword:
+                if let nextToken = index < expression.count - 1 ? expression[index + 1] : nil {
+                    switch nextToken.tokenKind {
+                    case .period:
+                        break
+                    default:
+                        continue
+                    }
+                } else {
+                    continue
+                }
             case .spacedBinaryOperator(_):
                 continue
             default:
