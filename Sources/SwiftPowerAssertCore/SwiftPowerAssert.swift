@@ -132,7 +132,7 @@ public final class SwiftPowerAssert {
             print(printValuesStatement, to: &os)
             print("", to: &os)
             if !internalTest {
-                print("XCTFail(\"'\" + \"assertion failed: \" + \"\(expressionList)\" + \"'\")", to: &os)
+                print("XCTFail(\"'\" + \"assertion failed: \" + \"\(expressionList.replacingOccurrences(of: "\"", with: "\\\""))\" + \"'\")", to: &os)
             }
             print("}", to: &os)
             print("}", to: &os)
