@@ -32,19 +32,19 @@ SwiftPowerAssert requires [Swift 4.1 toolchains](https://swift.org/download/#sna
 
 Installation
 ---------------------------------------
-1. Download and install [the latest trunk Swift development toolchain](https://swift.org/download/#snapshots).
-1. ```shell
-   git clone https://github.com/kishikawakatsumi/SwiftPowerAssert
-   ```
-1. ```shell
-   cd SwiftPowerAssert
-   ```
-1. ```shell
-   ~/Library/Developer/Toolchains/swift-latest.xctoolchain/usr/bin/swift package update
-   ```
-1. ```shell
-   ~/Library/Developer/Toolchains/swift-latest.xctoolchain/usr/bin/swift build -c release
-   ```
+    1. Download and install [the latest trunk Swift development toolchain](https://swift.org/download/#snapshots).
+    1.  ```shell
+        git clone https://github.com/kishikawakatsumi/SwiftPowerAssert
+        ```
+    1. ```shell
+       cd SwiftPowerAssert
+       ```
+    1. ```shell
+       ~/Library/Developer/Toolchains/swift-latest.xctoolchain/usr/bin/swift package update
+       ```
+    1. ```shell
+       ~/Library/Developer/Toolchains/swift-latest.xctoolchain/usr/bin/swift build -c release
+       ```
 
 Getting Started
 ---------------------------------------
