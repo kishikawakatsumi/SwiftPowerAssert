@@ -57,7 +57,7 @@ Getting Started
 
 SwiftPowerAssert injects instrument code into the `assert()` methods. There is no automatic mechanism to hook the compiler in Xcode unfortunately, so setup it manually using "Run Script Phase."
 
-https://user-images.githubusercontent.com/40610/33810940-3b62ae9c-de4f-11e7-9c0d-43fa9d705fcc.png
+<img src='https://user-images.githubusercontent.com/40610/33810940-3b62ae9c-de4f-11e7-9c0d-43fa9d705fcc.png' alt='Pre/Post build actions'>
 
 Instrument the source code with `SwiftPowerAssert instrument ...` command.
 
