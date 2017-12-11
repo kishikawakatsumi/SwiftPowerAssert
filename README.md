@@ -85,9 +85,11 @@ Inject an instrument code into the * .swift files in the specified directory.
 
 Replace `XCTAsertXXX()` methods with `assert()`.
 
-|`XCTAssertEqual(username, "kishikawakatsumi")`|`assert(username == "kishikawakatsumi")`|
-|`XCTAssertEqual(bar.val, bar.foo.val)`|`assert(bar.val == bar.foo.val)`|
-|`XCTAssertNil(error)`|`assert(error == nil)`|
+| XCTest        | SwiftPowerAssert|
+| ------------- |-------------|
+| `XCTAssertEqual(username, "kishikawakatsumi")` |`assert(username == "kishikawakatsumi")` |
+| `XCTAssertEqual(bar.val, bar.foo.val)`         |`assert(bar.val == bar.foo.val)`         |
+| `XCTAssertNil(error)`                          |`assert(error == nil)                    |
 
 Author
 ---------------------------------------
