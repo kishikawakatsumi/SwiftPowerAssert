@@ -77,7 +77,7 @@ cp -R "${TMPDIR%/}/Tests" "$SRCROOT"
 
 Usage
 ---------------------------------------
-Inject an instrument code into the * .swift files in the specified directory.
+Inject an instrument code into the * .swift files in the specified directory.
 
 ```shell
 /path/to/SwiftPowerAssert instrument _file_or_directory_
