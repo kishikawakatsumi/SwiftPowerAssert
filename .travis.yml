@@ -1,0 +1,16 @@
+language: objective-c
+osx_image: xcode9.2
+install:
+- eval "$(curl -sL https://swiftenv.fuller.li/install.sh)"
+script:
+- swift package generate-xcodeproj
+- xcodebuild test -scheme SwiftPowerAssert-Package
+env:
+  global:
+  - LANG=en_US.UTF-8
+  - LC_ALL=en_US.UTF-8
+  matrix:
+  - TOOLCHAINS=org.swift.3020171208a
+branches:
+  only:
+  - master
