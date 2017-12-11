@@ -55,7 +55,7 @@ Copy the file (`.build/x86_64-apple-macosx10.10/release/SwiftPowerAssert`) to yo
 Getting Started
 ---------------------------------------
 
-SwiftPowerAssert injects instrument code into the `assert ()` methods. There is no automatic mechanism to hook the compiler in Xcode unfortunately, so setup it manually using "Run Script Phase."
+SwiftPowerAssert injects instrument code into the `assert()` methods. There is no automatic mechanism to hook the compiler in Xcode unfortunately, so setup it manually using "Run Script Phase."
 
 https://user-images.githubusercontent.com/40610/33810940-3b62ae9c-de4f-11e7-9c0d-43fa9d705fcc.png
 
