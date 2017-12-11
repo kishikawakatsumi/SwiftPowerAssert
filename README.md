@@ -50,11 +50,44 @@ cd SwiftPowerAssert
 ~/Library/Developer/Toolchains/swift-latest.xctoolchain/usr/bin/swift build -c release
 ```
 
+Copy the file (`.build/x86_64-apple-macosx10.10/release/SwiftPowerAssert`) to your binary location.
+
 Getting Started
 ---------------------------------------
 
+SwiftPowerAssert injects instrument code into the `assert ()` methods. There is no automatic mechanism to hook the compiler in Xcode unfortunately, so setup it manually using "Run Script Phase."
+
+https://user-images.githubusercontent.com/40610/33810940-3b62ae9c-de4f-11e7-9c0d-43fa9d705fcc.png
+
+Instrument the source code with `SwiftPowerAssert instrument ...` command.
+
+Note: Back up the source files to a temporary directory to restore after compilation.
+
+```shell
+cp -R "${SRCROOT%/}/Tests" $TMPDIR
+
+/path/to/SwiftPowerAssert instrument "${SRCROOT%/}/Tests"
+```
+
+Restore the original source files from backup after compilation.
+
+```shell
+cp -R "${TMPDIR%/}/Tests" "$SRCROOT"
+```
+
 Usage
 ---------------------------------------
+Inject an instrument code into the * .swift files in the specified directory.
+
+```shell
+/path/to/SwiftPowerAssert instrument _file_or_directory_
+```
+
+Replace `XCTAsertXXX()` methods with `assert()`.
+
+|`XCTAssertEqual(username, "kishikawakatsumi")`|`assert(username == "kishikawakatsumi")`|
+|`XCTAssertEqual(bar.val, bar.foo.val)`|`assert(bar.val == bar.foo.val)`|
+|`XCTAssertNil(error)`|`assert(error == nil)`|
 
 Author
 ---------------------------------------
