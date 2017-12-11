@@ -80,7 +80,7 @@ Usage
 Inject an instrument code into the `*.swift` files in the specified directory.
 
 ```shell
-/path/to/SwiftPowerAssert instrument _file_or_directory_
+/path/to/SwiftPowerAssert instrument file_or_directory
 ```
 
 Replace `XCTAsertXXX()` methods with `assert()`.
