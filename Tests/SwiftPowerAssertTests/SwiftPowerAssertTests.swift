@@ -19,6 +19,47 @@
 import XCTest
 import SwiftPowerAssertCore
 
+struct TestRunner {
+    func run(source: String, identifier: String = #function) throws -> String {
+        let temporaryDirectory = NSTemporaryDirectory()
+        let sourceFilePath = (temporaryDirectory as NSString).appendingPathComponent("SwiftPowerAssertTests-\(identifier).swift")
+        let executablePath = (sourceFilePath as NSString).deletingPathExtension + "o"
+
+        try source.write(toFile: sourceFilePath, atomically: true, encoding: .utf8)
+
+        let runner = SwiftPowerAssert(sources: sourceFilePath, output: temporaryDirectory, internalTest: true)
+        try runner.run()
+
+        let compile = Process()
+        compile.launchPath = "/usr/bin/xcrun"
+        compile.arguments = [
+            "swiftc",
+            "-F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+            "-Xlinker",
+            "-rpath",
+            "-Xlinker",
+            "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+            sourceFilePath,
+            "-o",
+            executablePath
+        ]
+        compile.launch()
+        compile.waitUntilExit()
+
+        let exec = Process()
+        exec.launchPath = executablePath
+        let pipe = Pipe()
+        exec.standardOutput = pipe
+        exec.launch()
+        exec.waitUntilExit()
+
+        let result = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)!
+        print(result)
+
+        return result
+    }
+}
+
 class SwiftPowerAssertTests: XCTestCase {
     func testBinaryExpression1() throws {
         let source = """
@@ -42,37 +83,6 @@ class SwiftPowerAssertTests: XCTestCase {
 
             Tests().testMethod()
             """
-        let testFilePath = (NSTemporaryDirectory() as NSString).appendingPathComponent("SwiftPowerAssertTests-\(#function).swift")
-        try source.write(toFile: testFilePath, atomically: true, encoding: .utf8)
-
-        let outputDir = NSTemporaryDirectory()
-        let runner = SwiftPowerAssert(sources: testFilePath, output: outputDir, internalTest: true)
-        try runner.run()
-
-        let outputPath = (outputDir as NSString).appendingPathComponent(URL(fileURLWithPath: testFilePath).lastPathComponent)
-
-        let compile = Process()
-        compile.launchPath = "/usr/bin/xcrun"
-        compile.arguments = [
-            "swiftc",
-            "-F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
-            "-Xlinker",
-            "-rpath",
-            "-Xlinker",
-            "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
-            outputPath,
-            "-o",
-            outputPath + ".o",
-        ]
-        compile.launch()
-        compile.waitUntilExit()
-
-        let exec = Process()
-        exec.launchPath = outputPath + ".o"
-        let pipe = Pipe()
-        exec.standardOutput = pipe
-        exec.launch()
-        exec.waitUntilExit()
 
         let expected = """
             assert(bar.val == bar.foo.val)
@@ -83,8 +93,8 @@ class SwiftPowerAssertTests: XCTestCase {
                    Bar(foo: main.Foo(val: 2), val: 3)
 
             """
-        let result = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
-        print(result!)
+
+        let result = try TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -110,37 +120,6 @@ class SwiftPowerAssertTests: XCTestCase {
 
             Tests().testMethod()
             """
-        let testFilePath = (NSTemporaryDirectory() as NSString).appendingPathComponent("SwiftPowerAssertTests-\(#function).swift")
-        try source.write(toFile: testFilePath, atomically: true, encoding: .utf8)
-
-        let outputDir = NSTemporaryDirectory()
-        let runner = SwiftPowerAssert(sources: testFilePath, output: outputDir, internalTest: true)
-        try runner.run()
-
-        let outputPath = (outputDir as NSString).appendingPathComponent(URL(fileURLWithPath: testFilePath).lastPathComponent)
-
-        let compile = Process()
-        compile.launchPath = "/usr/bin/xcrun"
-        compile.arguments = [
-            "swiftc",
-            "-F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
-            "-Xlinker",
-            "-rpath",
-            "-Xlinker",
-            "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
-            outputPath,
-            "-o",
-            outputPath + ".o",
-        ]
-        compile.launch()
-        compile.waitUntilExit()
-
-        let exec = Process()
-        exec.launchPath = outputPath + ".o"
-        let pipe = Pipe()
-        exec.standardOutput = pipe
-        exec.launch()
-        exec.waitUntilExit()
 
         let expected = """
             assert(bar.val < bar.foo.val)
@@ -151,8 +130,8 @@ class SwiftPowerAssertTests: XCTestCase {
                    Bar(foo: main.Foo(val: 2), val: 3)
 
             """
-        let result = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
-        print(result!)
+
+        let result = try TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -175,38 +154,6 @@ class SwiftPowerAssertTests: XCTestCase {
             Tests().testMethod()
             """
 
-        let testFilePath = (NSTemporaryDirectory() as NSString).appendingPathComponent("SwiftPowerAssertTests-\(#function).swift")
-        try source.write(toFile: testFilePath, atomically: true, encoding: .utf8)
-
-        let outputDir = NSTemporaryDirectory()
-        let runner = SwiftPowerAssert(sources: testFilePath, output: outputDir, internalTest: true)
-        try runner.run()
-
-        let outputPath = (outputDir as NSString).appendingPathComponent(URL(fileURLWithPath: testFilePath).lastPathComponent)
-
-        let compile = Process()
-        compile.launchPath = "/usr/bin/xcrun"
-        compile.arguments = [
-            "swiftc",
-            "-F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
-            "-Xlinker",
-            "-rpath",
-            "-Xlinker",
-            "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
-            outputPath,
-            "-o",
-            outputPath + ".o",
-        ]
-        compile.launch()
-        compile.waitUntilExit()
-
-        let exec = Process()
-        exec.launchPath = outputPath + ".o"
-        let pipe = Pipe()
-        exec.standardOutput = pipe
-        exec.launch()
-        exec.waitUntilExit()
-
         let expected = """
             assert(array.index(of: zero) == two)
                    |     |         |        |
@@ -214,8 +161,8 @@ class SwiftPowerAssertTests: XCTestCase {
                    [1, 2, 3]
 
             """
-        let result = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
-        print(result!)
+
+        let result = try TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -238,38 +185,6 @@ class SwiftPowerAssertTests: XCTestCase {
             Tests().testMethod()
             """
 
-        let testFilePath = (NSTemporaryDirectory() as NSString).appendingPathComponent("SwiftPowerAssertTests-\(#function).swift")
-        try source.write(toFile: testFilePath, atomically: true, encoding: .utf8)
-
-        let outputDir = NSTemporaryDirectory()
-        let runner = SwiftPowerAssert(sources: testFilePath, output: outputDir, internalTest: true)
-        try runner.run()
-
-        let outputPath = (outputDir as NSString).appendingPathComponent(URL(fileURLWithPath: testFilePath).lastPathComponent)
-
-        let compile = Process()
-        compile.launchPath = "/usr/bin/xcrun"
-        compile.arguments = [
-            "swiftc",
-            "-F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
-            "-Xlinker",
-            "-rpath",
-            "-Xlinker",
-            "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
-            outputPath,
-            "-o",
-            outputPath + ".o",
-        ]
-        compile.launch()
-        compile.waitUntilExit()
-
-        let exec = Process()
-        exec.launchPath = outputPath + ".o"
-        let pipe = Pipe()
-        exec.standardOutput = pipe
-        exec.launch()
-        exec.waitUntilExit()
-
         let expected = """
             assert(array.description.hasPrefix("[") == false && array.description.hasPrefix("Hello") == true)
                    |     |           |         |                |     |           |         |           |
@@ -277,9 +192,9 @@ class SwiftPowerAssertTests: XCTestCase {
                    [1, 2, 3]                                    [1, 2, 3]
 
             """
-        let result = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
-        print(result!)
-        XCTAssertEqual(expected, result!)
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
     }
 
     func testBinaryExpression5() throws {
@@ -311,37 +226,6 @@ class SwiftPowerAssertTests: XCTestCase {
 
             Tests().testMethod()
             """
-        let testFilePath = (NSTemporaryDirectory() as NSString).appendingPathComponent("SwiftPowerAssertTests-\(#function).swift")
-        try source.write(toFile: testFilePath, atomically: true, encoding: .utf8)
-
-        let outputDir = NSTemporaryDirectory()
-        let runner = SwiftPowerAssert(sources: testFilePath, output: outputDir, internalTest: true)
-        try runner.run()
-
-        let outputPath = (outputDir as NSString).appendingPathComponent(URL(fileURLWithPath: testFilePath).lastPathComponent)
-
-        let compile = Process()
-        compile.launchPath = "/usr/bin/xcrun"
-        compile.arguments = [
-            "swiftc",
-            "-F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
-            "-Xlinker",
-            "-rpath",
-            "-Xlinker",
-            "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
-            outputPath,
-            "-o",
-            outputPath + ".o",
-        ]
-        compile.launch()
-        compile.waitUntilExit()
-
-        let exec = Process()
-        exec.launchPath = outputPath + ".o"
-        let pipe = Pipe()
-        exec.standardOutput = pipe
-        exec.launch()
-        exec.waitUntilExit()
 
         let expected = """
             assert(array.index(of: zero) == two && bar.val == bar.foo.val)
@@ -352,8 +236,8 @@ class SwiftPowerAssertTests: XCTestCase {
                                                    Bar(foo: main.Foo(val: 2), val: 3)
 
             """
-        let result = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
-        print(result!)
+
+        let result = try TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -375,37 +259,6 @@ class SwiftPowerAssertTests: XCTestCase {
 
             Tests().testMethod()
             """
-        let testFilePath = (NSTemporaryDirectory() as NSString).appendingPathComponent("SwiftPowerAssertTests-\(#function).swift")
-        try source.write(toFile: testFilePath, atomically: true, encoding: .utf8)
-
-        let outputDir = NSTemporaryDirectory()
-        let runner = SwiftPowerAssert(sources: testFilePath, output: outputDir, internalTest: true)
-        try runner.run()
-
-        let outputPath = (outputDir as NSString).appendingPathComponent(URL(fileURLWithPath: testFilePath).lastPathComponent)
-
-        let compile = Process()
-        compile.launchPath = "/usr/bin/xcrun"
-        compile.arguments = [
-            "swiftc",
-            "-F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
-            "-Xlinker",
-            "-rpath",
-            "-Xlinker",
-            "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
-            outputPath,
-            "-o",
-            outputPath + ".o",
-        ]
-        compile.launch()
-        compile.waitUntilExit()
-
-        let exec = Process()
-        exec.launchPath = outputPath + ".o"
-        let pipe = Pipe()
-        exec.standardOutput = pipe
-        exec.launch()
-        exec.waitUntilExit()
 
         let expected = """
             assert(array.distance(from: 2, to: 3) == 4)
@@ -414,8 +267,8 @@ class SwiftPowerAssertTests: XCTestCase {
                    [1, 2, 3]
 
             """
-        let result = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
-        print(result!)
+
+        let result = try TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -439,37 +292,6 @@ class SwiftPowerAssertTests: XCTestCase {
 
             Tests().testMethod()
             """
-        let testFilePath = (NSTemporaryDirectory() as NSString).appendingPathComponent("SwiftPowerAssertTests-\(#function).swift")
-        try source.write(toFile: testFilePath, atomically: true, encoding: .utf8)
-
-        let outputDir = NSTemporaryDirectory()
-        let runner = SwiftPowerAssert(sources: testFilePath, output: outputDir, internalTest: true)
-        try runner.run()
-
-        let outputPath = (outputDir as NSString).appendingPathComponent(URL(fileURLWithPath: testFilePath).lastPathComponent)
-
-        let compile = Process()
-        compile.launchPath = "/usr/bin/xcrun"
-        compile.arguments = [
-            "swiftc",
-            "-F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
-            "-Xlinker",
-            "-rpath",
-            "-Xlinker",
-            "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
-            outputPath,
-            "-o",
-            outputPath + ".o",
-        ]
-        compile.launch()
-        compile.waitUntilExit()
-
-        let exec = Process()
-        exec.launchPath = outputPath + ".o"
-        let pipe = Pipe()
-        exec.standardOutput = pipe
-        exec.launch()
-        exec.waitUntilExit()
 
         let expected = """
             assert([one, two, three].count == 10)
@@ -477,8 +299,8 @@ class SwiftPowerAssertTests: XCTestCase {
                                      3        10
 
             """
-        let result = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
-        print(result!)
+
+        let result = try TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 }
