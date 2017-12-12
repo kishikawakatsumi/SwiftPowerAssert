@@ -89,7 +89,7 @@ Replace `XCTAsertXXX()` methods with `assert()`.
 | ------------- |-------------|
 | `XCTAssertEqual(username, "kishikawakatsumi")` |`assert(username == "kishikawakatsumi")` |
 | `XCTAssertEqual(bar.val, bar.foo.val)`         |`assert(bar.val == bar.foo.val)`         |
-| `XCTAssertNil(error)`                          |`assert(error == nil)                    |
+| `XCTAssertNil(error)`                          |`assert(error == nil)`                   |
 
 Author
 ---------------------------------------
