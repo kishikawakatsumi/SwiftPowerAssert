@@ -34,6 +34,8 @@ struct TestRunner {
         compile.launchPath = "/usr/bin/xcrun"
         compile.arguments = [
             "swiftc",
+            "-O",
+            "-whole-module-optimization",
             "-F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
             "-Xlinker",
             "-rpath",
