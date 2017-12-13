@@ -189,8 +189,8 @@ class SwiftPowerAssertTests: XCTestCase {
 
         let expected = """
             assert(array.description.hasPrefix("[") == false && array.description.hasPrefix("Hello") == true)
-                   |     |           |         |                |     |           |         |           |
-                   |     [1, 2, 3]   true      [                |     [1, 2, 3]   false     Hello       true
+                   |     |           |         |       |        |     |           |         |           |
+                   |     [1, 2, 3]   true      [       false    |     [1, 2, 3]   false     Hello       true
                    [1, 2, 3]                                    [1, 2, 3]
 
             """
@@ -297,8 +297,8 @@ class SwiftPowerAssertTests: XCTestCase {
 
         let expected = """
             assert([one, two, three].count == 10)
-                                     |        |
-                                     3        10
+                    |    |    |      |        |
+                    1    2    3      3        10
 
             """
 
