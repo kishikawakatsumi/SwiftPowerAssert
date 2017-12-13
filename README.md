@@ -52,7 +52,7 @@ cd SwiftPowerAssert
 ~/Library/Developer/Toolchains/swift-latest.xctoolchain/usr/bin/swift build -c release
 ```
 
-Copy the file (`.build/x86_64-apple-macosx10.10/release/SwiftPowerAssert`) to your binary location.
+Copy the file (`.build/x86_64-apple-macosx10.10/release/swift-power-assert`) to your binary location.
 
 Getting Started
 ---------------------------------------
@@ -68,7 +68,7 @@ Note: Back up the source files to a temporary directory to restore after compila
 ```shell
 cp -R "${SRCROOT%/}/Tests" $TMPDIR
 
-/path/to/SwiftPowerAssert instrument "${SRCROOT%/}/Tests"
+/path/to/swift-power-assert instrument "${SRCROOT%/}/Tests"
 ```
 
 Restore the original source files from backup after compilation.
@@ -82,7 +82,7 @@ Usage
 Inject an instrument code into the `*.swift` files in the specified directory.
 
 ```shell
-/path/to/SwiftPowerAssert instrument file_or_directory
+/path/to/swift-power-assert instrument file_or_directory
 ```
 
 Replace `XCTAssertXXX()` methods with `assert()`.
