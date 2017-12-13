@@ -6,8 +6,6 @@ script:
 - swift package generate-xcodeproj
 - xcodebuild test -scheme SwiftPowerAssert-Package -configuration $CONFIGURATION
   -sdk macosx -destination 'platform=OS X,arch=x86_64'
-after_success:
-- bash <(curl -s https://codecov.io/bash)
 env:
   global:
   - LANG=en_US.UTF-8
