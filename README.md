@@ -83,7 +83,7 @@ Inject an instrument code into the `*.swift` files in the specified directory.
 /path/to/SwiftPowerAssert instrument file_or_directory
 ```
 
-Replace `XCTAsertXXX()` methods with `assert()`.
+Replace `XCTAssertXXX()` methods with `assert()`.
 
 | XCTest        | SwiftPowerAssert|
 | ------------- |-------------|
