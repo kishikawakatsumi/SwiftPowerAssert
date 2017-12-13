@@ -357,4 +357,37 @@ class SwiftPowerAssertTests: XCTestCase {
         let result = try TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
+
+//    func testNewlineInAssert() throws {
+//        let source = """
+//            import XCTest
+//
+//            class Tests: XCTestCase {
+//                func testMethod() {
+//                    let zero = 0
+//                    let one = 1
+//                    let two = 2
+//                    let three = 3
+//
+//                    let array = [one, two, three]
+//                    assert(array
+//                               .distance(from: 2, to: 3)
+//                               == 4)
+//                }
+//            }
+//
+//            Tests().testMethod()
+//            """
+//
+//        let expected = """
+//            assert(array .distance(from: 2, to: 3) == 4)
+//                   |     |              |      |  |  |
+//                   |     1              2      3  |  4
+//                   [1, 2, 3]                      false
+//
+//            """
+//
+//        let result = try TestRunner().run(source: source)
+//        XCTAssertEqual(expected, result)
+//    }
 }
