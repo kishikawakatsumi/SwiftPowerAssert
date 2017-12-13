@@ -90,31 +90,27 @@ class ValueRecorder: SyntaxRewriter {
                 \({ () -> String in
                     var recodValues = ""
                     for expression in expressions {
-                        let determiner = TokenColumnFinder(expression.children.flatMap { $0 as? TokenSyntax }.last!)
-                        _ = determiner.visit(node)
-                        if let column = determiner.column {
+                        let column = caluclateColumn(expression.children.flatMap { $0 as? TokenSyntax }.last!, in: node)
+                        if let column = column {
                             recodValues += "valueColumns[\(offset + column)] = \"\\(toString(\(expression)))\"\n"
                         }
                     }
                     for expression in functionCallList {
-                        let determiner = TokenColumnFinder(expression[expression.map {$0.text}.index(of: "(")! - 1])
-                        _ = determiner.visit(node)
-                        if let column = determiner.column {
+                        let column = caluclateColumn(expression[expression.map {$0.text}.index(of: "(")! - 1], in: node)
+                        if let column = column {
                             recodValues += "valueColumns[\(offset + column)] = \"\\(toString(\(expression.map { $0.description }.joined())))\"\n"
                         }
                     }
                     for expression in subscriptingList {
-                        let determiner = TokenColumnFinder(expression[expression.map {$0.text}.index(of: "[")! - 1])
-                        _ = determiner.visit(node)
-                        if let column = determiner.column {
+                        let column = caluclateColumn(expression[expression.map {$0.text}.index(of: "[")! - 1], in: node)
+                        if let column = column {
                             recodValues += "valueColumns[\(offset + column)] = \"\\(toString(\(expression.map { $0.description }.joined())))\"\n"
                         }
                     }
                     for (index, binaryOperator) in binaryOperators.enumerated() {
                         let binaryOperatorExpression = binaryOperatorExpressions[index]
-                        let determiner = TokenColumnFinder(binaryOperator.children.flatMap { $0 as? TokenSyntax }[0])
-                        _ = determiner.visit(binaryOperatorExpression)
-                        if let column = determiner.column {
+                        let column = caluclateColumn(binaryOperator.children.flatMap { $0 as? TokenSyntax }[0], in: node)
+                        if let column = column {
                             recodValues += "valueColumns[\(offset + column)] = \"\\(toString(\(binaryOperatorExpression)))\"\n"
                         }
                     }
@@ -242,6 +238,31 @@ class ValueRecorder: SyntaxRewriter {
             }
             index += 1
         }
+    }
+
+    private func caluclateColumn(_ target: TokenSyntax, in node: Syntax) -> Int? {
+        class TokenVisitor: SyntaxRewriter {
+            var column: Int?
+            var count = 0
+            let target: TokenSyntax
+
+            init(_ target: TokenSyntax) {
+                self.target = target
+            }
+
+            override func visit(_ token: TokenSyntax) -> Syntax {
+                if token == target {
+                    column = count
+                } else {
+                    count += token.description.count
+                }
+                return token
+            }
+        }
+
+        let tokenVisitor = TokenVisitor(target)
+        _ = tokenVisitor.visit(node)
+        return tokenVisitor.column
     }
 
     private class TokenVisitor: SyntaxRewriter {
@@ -381,25 +402,6 @@ class ValueRecorder: SyntaxRewriter {
                 recorder.binaryOperatorExpressions.append(parent)
             }
             return node
-        }
-    }
-
-    private class TokenColumnFinder: SyntaxRewriter {
-        var column: Int?
-        private let targetToken: TokenSyntax
-        private var columnCount = 0
-
-        init(_ targetToken: TokenSyntax) {
-            self.targetToken = targetToken
-        }
-
-        override func visit(_ token: TokenSyntax) -> Syntax {
-            if token == targetToken {
-                column = columnCount
-            } else {
-                columnCount += token.description.count
-            }
-            return token
         }
     }
 }
