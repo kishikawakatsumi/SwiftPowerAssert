@@ -27,7 +27,7 @@ struct TestRunner {
 
         try source.write(toFile: sourceFilePath, atomically: true, encoding: .utf8)
 
-        let runner = SwiftPowerAssert(sources: sourceFilePath, output: temporaryDirectory, internalTest: true)
+        let runner = SwiftPowerAssert(sources: sourceFilePath, output: temporaryDirectory, testable: true)
         try runner.run()
 
         let compile = Process()
@@ -53,7 +53,6 @@ struct TestRunner {
         let pipe = Pipe()
         exec.standardOutput = pipe
         exec.launch()
-        exec.waitUntilExit()
 
         let result = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)!
         print(result)
@@ -88,10 +87,11 @@ class SwiftPowerAssertTests: XCTestCase {
 
         let expected = """
             assert(bar.val == bar.foo.val)
-                   |   |      |   |   |
-                   |   3      |   |   2
-                   |          |   Foo(val: 2)
-                   |          Bar(foo: main.Foo(val: 2), val: 3)
+                   |   |   |  |   |   |
+                   |   3   |  |   |   2
+                   |       |  |   Foo(val: 2)
+                   |       |  Bar(foo: main.Foo(val: 2), val: 3)
+                   |       false
                    Bar(foo: main.Foo(val: 2), val: 3)
 
             """
@@ -125,10 +125,11 @@ class SwiftPowerAssertTests: XCTestCase {
 
         let expected = """
             assert(bar.val < bar.foo.val)
-                   |   |     |   |   |
-                   |   3     |   |   2
-                   |         |   Foo(val: 2)
-                   |         Bar(foo: main.Foo(val: 2), val: 3)
+                   |   |   | |   |   |
+                   |   3   | |   |   2
+                   |       | |   Foo(val: 2)
+                   |       | Bar(foo: main.Foo(val: 2), val: 3)
+                   |       false
                    Bar(foo: main.Foo(val: 2), val: 3)
 
             """
@@ -158,9 +159,9 @@ class SwiftPowerAssertTests: XCTestCase {
 
         let expected = """
             assert(array.index(of: zero) == two)
-                   |     |         |        |
-                   |     nil       0        2
-                   [1, 2, 3]
+                   |     |         |     |  |
+                   |     nil       0     |  2
+                   [1, 2, 3]             false
 
             """
 
@@ -189,9 +190,10 @@ class SwiftPowerAssertTests: XCTestCase {
 
         let expected = """
             assert(array.description.hasPrefix("[") == false && array.description.hasPrefix("Hello") == true)
-                   |     |           |         |       |        |     |           |         |           |
-                   |     [1, 2, 3]   true      [       false    |     [1, 2, 3]   false     Hello       true
-                   [1, 2, 3]                                    [1, 2, 3]
+                   |     |           |         |    |  |     |  |     |           |         |        |  |
+                   |     [1, 2, 3]   true      [    |  false |  |     [1, 2, 3]   false     Hello    |  true
+                   [1, 2, 3]                        false    |  [1, 2, 3]                            false
+                                                             false
 
             """
 
@@ -231,11 +233,13 @@ class SwiftPowerAssertTests: XCTestCase {
 
         let expected = """
             assert(array.index(of: zero) == two && bar.val == bar.foo.val)
-                   |     |         |        |      |   |      |   |   |
-                   |     nil       0        2      |   3      |   |   2
-                   [1, 2, 3]                       |          |   Foo(val: 2)
-                                                   |          Bar(foo: main.Foo(val: 2), val: 3)
-                                                   Bar(foo: main.Foo(val: 2), val: 3)
+                   |     |         |     |  |   |  |   |   |  |   |   |
+                   |     nil       0     |  2   |  |   3   |  |   |   2
+                   [1, 2, 3]             false  |  |       |  |   Foo(val: 2)
+                                                |  |       |  Bar(foo: main.Foo(val: 2), val: 3)
+                                                |  |       false
+                                                |  Bar(foo: main.Foo(val: 2), val: 3)
+                                                false
 
             """
 
@@ -264,9 +268,9 @@ class SwiftPowerAssertTests: XCTestCase {
 
         let expected = """
             assert(array.distance(from: 2, to: 3) == 4)
-                   |     |              |      |     |
-                   |     1              2      3     4
-                   [1, 2, 3]
+                   |     |              |      |  |  |
+                   |     1              2      3  |  4
+                   [1, 2, 3]                      false
 
             """
 
@@ -297,8 +301,56 @@ class SwiftPowerAssertTests: XCTestCase {
 
         let expected = """
             assert([one, two, three].count == 10)
-                    |    |    |      |        |
-                    1    2    3      3        10
+                    |    |    |      |     |  |
+                    1    2    3      3     |  10
+                                           false
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
+    func testBinaryExpression8() throws {
+        let source = """
+            import XCTest
+
+            struct Object {
+                let types: [Any?]
+            }
+
+            struct Person {
+                let name: String
+                let age: Int
+            }
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let alice = Person(name: "alice", age: 3)
+                    let bob = Person(name: "bob", age: 5)
+                    let index = 7
+
+                    let types: [Any?] = ["string", 98.6, true, false, nil, Double.nan, Double.infinity, alice]
+
+                    let object = Object(types: types)
+
+                    assert((object.types[index] as! Person).name == bob.name)
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert((object.types[index] as! Person).name == bob.name)
+                    |      |     |                | |    |  |   |
+                    |      |     7                | |    |  |   bob
+                    |      |                      | |    |  Person(name: "bob", age: 5)
+                    |      |                      | |    false
+                    |      |                      | alice
+                    |      |                      Person(name: "alice", age: 3)
+                    |      Person(name: "alice", age: 3)
+                    Object(types: [Optional("string"), Optional(98.599999999999994), Optional(true), Optional(false), nil, Optional(nan), Optional(inf), Optional(main.Person(name: "alice", age: 3))])
 
             """
 
