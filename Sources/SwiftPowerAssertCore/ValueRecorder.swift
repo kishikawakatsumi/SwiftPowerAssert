@@ -36,7 +36,23 @@ class ValueRecorder: SyntaxRewriter {
     private var binaryOperatorExpressions = [Syntax]()
 
     init(_ target: ExpressionStmtSyntax, testable: Bool = false) {
-        self.target = target
+        func removeNewline(expression: Syntax) -> Syntax {
+            class TokenVisitor: SyntaxRewriter {
+                func hasLeadingNewline(_ token: TokenSyntax) -> Bool {
+                    for piece in token.leadingTrivia { if case .newlines(_) = piece { return true } }
+                    return false
+                }
+
+                override func visit(_ token: TokenSyntax) -> Syntax {
+                    switch token.tokenKind {
+                    case .spacedBinaryOperator(_) where hasLeadingNewline(token): return token.withLeadingTrivia(.spaces(1))
+                    default: return token.withLeadingTrivia(.spaces(0))
+                    }
+                }
+            }
+            return TokenVisitor().visit(expression)
+        }
+        self.target = removeNewline(expression: target) as! ExpressionStmtSyntax
         self.testable = testable
     }
 
@@ -57,7 +73,7 @@ class ValueRecorder: SyntaxRewriter {
         _ = LiteralExpressionVisitor(self).visit(node)
         _ = BinaryOperatorExpressionVisitor(self).visit(node)
 
-        let assersionStatement = node.description.replacingOccurrences(of: "\"", with: "\\\"").replacingOccurrences(of: "\n", with: " ")
+        let assersionStatement = node.description.replacingOccurrences(of: "\"", with: "\\\"")
         let offset = "assert(".count
         code =
         """
@@ -77,21 +93,21 @@ class ValueRecorder: SyntaxRewriter {
                         let determiner = TokenColumnFinder(expression.children.flatMap { $0 as? TokenSyntax }.last!)
                         _ = determiner.visit(node)
                         if let column = determiner.column {
-                            recodValues += "valueColumns[\(offset + column)] = \"\\(toString(\(expression.description.replacingOccurrences(of: "\n", with: " "))))\"\n"
+                            recodValues += "valueColumns[\(offset + column)] = \"\\(toString(\(expression)))\"\n"
                         }
                     }
                     for expression in functionCallList {
                         let determiner = TokenColumnFinder(expression[expression.map {$0.text}.index(of: "(")! - 1])
                         _ = determiner.visit(node)
                         if let column = determiner.column {
-                            recodValues += "valueColumns[\(offset + column)] = \"\\(toString(\(expression.map { $0.description }.joined().replacingOccurrences(of: "\n", with: " "))))\"\n"
+                            recodValues += "valueColumns[\(offset + column)] = \"\\(toString(\(expression.map { $0.description }.joined())))\"\n"
                         }
                     }
                     for expression in subscriptingList {
                         let determiner = TokenColumnFinder(expression[expression.map {$0.text}.index(of: "[")! - 1])
                         _ = determiner.visit(node)
                         if let column = determiner.column {
-                            recodValues += "valueColumns[\(offset + column)] = \"\\(toString(\(expression.map { $0.description }.joined().replacingOccurrences(of: "\n", with: " "))))\"\n"
+                            recodValues += "valueColumns[\(offset + column)] = \"\\(toString(\(expression.map { $0.description }.joined())))\"\n"
                         }
                     }
                     for (index, binaryOperator) in binaryOperators.enumerated() {
@@ -99,7 +115,7 @@ class ValueRecorder: SyntaxRewriter {
                         let determiner = TokenColumnFinder(binaryOperator.children.flatMap { $0 as? TokenSyntax }[0])
                         _ = determiner.visit(binaryOperatorExpression)
                         if let column = determiner.column {
-                            recodValues += "valueColumns[\(offset + column)] = \"\\(toString(\(binaryOperatorExpression.description.replacingOccurrences(of: "\n", with: " "))))\"\n"
+                            recodValues += "valueColumns[\(offset + column)] = \"\\(toString(\(binaryOperatorExpression)))\"\n"
                         }
                     }
                     return recodValues
