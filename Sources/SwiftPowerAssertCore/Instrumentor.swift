@@ -48,12 +48,66 @@ class Instrumentor: SyntaxRewriter {
         return sourceFile
     }
 
-    class UnknownStatementVisitor: SyntaxRewriter {
-        var statement: StmtSyntax!
+    class DeclarationStatementVisitor: SyntaxRewriter {
+        let instrumentor: Instrumentor
 
-        override func visit(_ node: UnknownStmtSyntax) -> StmtSyntax {
-            statement = node
+        init(_ instrumentor: Instrumentor) {
+            self.instrumentor = instrumentor
+        }
+
+        override func visit(_ node: DeclarationStmtSyntax) -> StmtSyntax {
+            let typeInheritanceClauseVisitor = TypeInheritanceClauseVisitor(instrumentor, node)
+            _ = typeInheritanceClauseVisitor.visit(node)
+            for testCaseNode in typeInheritanceClauseVisitor.testCaseNodes {
+                let functionDeclarationVisitor = FunctionDeclarationVisitor()
+                _ = functionDeclarationVisitor.visit(testCaseNode)
+                for testMethodNode in functionDeclarationVisitor.testMethodNodes {
+                    let functionCallVisitor = FunctionCallVisitor(instrumentor)
+                    _ = functionCallVisitor.visit(testMethodNode)
+                }
+            }
             return node
+        }
+
+        class FunctionCallVisitor: SyntaxRewriter {
+            let instrumentor: Instrumentor
+
+            init(_ instrumentor: Instrumentor) {
+                self.instrumentor = instrumentor
+            }
+
+            override func visit(_ node: ExpressionStmtSyntax) -> StmtSyntax {
+                let identifierExpressionVisitor = IdentifierExpressionVisitor()
+                _ = identifierExpressionVisitor.visit(node)
+                if identifierExpressionVisitor.foundAssert {
+                    let transformer = ExpressionTransformer(node, trivia: identifierExpressionVisitor.trivia, internalTest: instrumentor.testable)
+                    _ = transformer.visit(node)
+
+                    instrumentor.target = node
+                    instrumentor.injectionCode = transformer.injectionCode
+                }
+                return node
+            }
+        }
+
+        class TypeInheritanceClauseVisitor: SyntaxRewriter {
+            let instrumentor: Instrumentor
+
+            var currentDeclarationNode: DeclarationStmtSyntax
+            var testCaseNodes = [DeclarationStmtSyntax]()
+
+            init(_ instrumentor: Instrumentor, _ currentDeclarationNode: DeclarationStmtSyntax) {
+                self.instrumentor = instrumentor
+                self.currentDeclarationNode = currentDeclarationNode
+            }
+
+            override func visit(_ node: TypeInheritanceClauseSyntax) -> Syntax {
+                for inheritedType in node.inheritedTypeCollection where !(inheritedType.typeName.children.flatMap { $0 as? TokenSyntax }.filter { $0.text == "XCTestCase" }.isEmpty) {
+                    testCaseNodes.append(currentDeclarationNode)
+                    return node
+                }
+                return node
+            }
         }
     }
 
@@ -73,47 +127,14 @@ class Instrumentor: SyntaxRewriter {
             return node
         }
     }
-}
 
-class DeclarationStatementVisitor: SyntaxRewriter {
-    let instrumentor: Instrumentor
+    class UnknownStatementVisitor: SyntaxRewriter {
+        var statement: StmtSyntax!
 
-    init(_ instrumentor: Instrumentor) {
-        self.instrumentor = instrumentor
-    }
-
-    override func visit(_ node: DeclarationStmtSyntax) -> StmtSyntax {
-        let typeInheritanceClauseVisitor = TypeInheritanceClauseVisitor(instrumentor, node)
-        _ = typeInheritanceClauseVisitor.visit(node)
-        for testCaseNode in typeInheritanceClauseVisitor.testCaseNodes {
-            let functionDeclarationVisitor = FunctionDeclarationVisitor()
-            _ = functionDeclarationVisitor.visit(testCaseNode)
-            for testMethodNode in functionDeclarationVisitor.testMethodNodes {
-                let functionCallVisitor = FunctionCallVisitor(instrumentor)
-                _ = functionCallVisitor.visit(testMethodNode)
-            }
-        }
-        return node
-    }
-}
-
-class TypeInheritanceClauseVisitor: SyntaxRewriter {
-    let instrumentor: Instrumentor
-
-    var currentDeclarationNode: DeclarationStmtSyntax
-    var testCaseNodes = [DeclarationStmtSyntax]()
-
-    init(_ instrumentor: Instrumentor, _ currentDeclarationNode: DeclarationStmtSyntax) {
-        self.instrumentor = instrumentor
-        self.currentDeclarationNode = currentDeclarationNode
-    }
-    
-    override func visit(_ node: TypeInheritanceClauseSyntax) -> Syntax {
-        for inheritedType in node.inheritedTypeCollection where !(inheritedType.typeName.children.flatMap { $0 as? TokenSyntax }.filter { $0.text == "XCTestCase" }.isEmpty) {
-            testCaseNodes.append(currentDeclarationNode)
+        override func visit(_ node: UnknownStmtSyntax) -> StmtSyntax {
+            statement = node
             return node
         }
-        return node
     }
 }
 
@@ -129,27 +150,6 @@ class FunctionDeclarationVisitor: SyntaxRewriter {
             testMethodNodes.append(testMethodNode)
         }
         return token
-    }
-}
-
-class FunctionCallVisitor: SyntaxRewriter {
-    let instrumentor: Instrumentor
-
-    init(_ instrumentor: Instrumentor) {
-        self.instrumentor = instrumentor
-    }
-
-    override func visit(_ node: ExpressionStmtSyntax) -> StmtSyntax {
-        let identifierExpressionVisitor = IdentifierExpressionVisitor()
-        _ = identifierExpressionVisitor.visit(node)
-        if identifierExpressionVisitor.foundAssert {
-            let transformer = ExpressionTransformer(node, trivia: identifierExpressionVisitor.trivia, internalTest: instrumentor.testable)
-            _ = transformer.visit(node)
-
-            instrumentor.target = node
-            instrumentor.injectionCode = transformer.injectionCode
-        }
-        return node
     }
 }
 
