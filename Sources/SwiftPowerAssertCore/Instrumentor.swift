@@ -20,13 +20,13 @@ import Foundation
 import SwiftSyntax
 
 class Instrumentor: SyntaxRewriter {
-    let internalTest: Bool
+    let testable: Bool
     
     var target: StmtSyntax?
     var injectionCode: String?
 
-    init(internalTest: Bool = false) {
-        self.internalTest = internalTest
+    init(testable: Bool = false) {
+        self.testable = testable
     }
 
     func instrument(sourceFile: SourceFileSyntax) throws -> Syntax {
@@ -143,7 +143,7 @@ class FunctionCallVisitor: SyntaxRewriter {
         let identifierExpressionVisitor = IdentifierExpressionVisitor()
         _ = identifierExpressionVisitor.visit(node)
         if identifierExpressionVisitor.foundAssert {
-            let transformer = ExpressionTransformer(node, trivia: identifierExpressionVisitor.trivia, internalTest: instrumentor.internalTest)
+            let transformer = ExpressionTransformer(node, trivia: identifierExpressionVisitor.trivia, internalTest: instrumentor.testable)
             _ = transformer.visit(node)
 
             instrumentor.target = node
@@ -178,16 +178,20 @@ class IdentifierExpressionVisitor: SyntaxRewriter {
 
 class ExpressionTransformer: SyntaxRewriter {
     var injectionCode = ""
-    private var expressionList = [[TokenSyntax]]()
-    private var expressions = [ExprSyntax]()
-    private var tokens = [TokenSyntax]()
 
-    private var argumentListNode: FunctionCallArgumentSyntax!
     private let parentNode: ExpressionStmtSyntax
     private let trivia: Trivia?
     private let internalTest: Bool
 
-    private var functionCallExpressions = [[TokenSyntax]]()
+    private var expressions = [ExprSyntax]()
+    private var functionCallList = [[TokenSyntax]]()
+    private var subscriptingList = [[TokenSyntax]]()
+
+    private var tokens = [TokenSyntax]()
+    private var functionCalls = [[TokenSyntax]]()
+    private var subscriptings = [[TokenSyntax]]()
+    private var binaryOperators = [ExprSyntax]()
+    private var binaryOperatorExpressions = [Syntax]()
 
     init(_ parentNode: ExpressionStmtSyntax, trivia: Trivia? = nil, internalTest: Bool = false) {
         self.parentNode = parentNode
@@ -195,56 +199,17 @@ class ExpressionTransformer: SyntaxRewriter {
         self.internalTest = internalTest
     }
 
-    private func extractFunctionCallExpressions(_ tokens: [TokenSyntax]) {
-        var functionCallExpression = [TokenSyntax]()
-        var parens = [TokenSyntax]()
-        var index = 0
-        while index < tokens.count {
-            let token = tokens[index]
-
-            switch token.tokenKind {
-            case .identifier(_):
-                if let nextToken = index < tokens.count - 1 ? tokens[index + 1] : nil, case .leftParen = nextToken.tokenKind {
-                    if parens.isEmpty {
-                        functionCallExpression.append(token)
-                        functionCallExpression.append(nextToken)
-                        parens.append(nextToken)
-                        index += 2
-                        continue
-                    }
-                }
-            case .leftParen:
-                parens.append(token)
-            case .rightParen:
-                parens.removeLast()
-                if parens.isEmpty {
-                    functionCallExpression.append(token)
-                    functionCallExpressions.append(functionCallExpression)
-                    extractFunctionCallExpressions(Array(functionCallExpression.dropFirst().dropFirst().dropLast()))
-
-                    functionCallExpression.removeAll()
-                    parens.removeAll()
-                }
-            default:
-                break
-            }
-            if !functionCallExpression.isEmpty {
-                functionCallExpression.append(token)
-            }
-            index += 1
-        }
-    }
-
     override func visit(_ node: FunctionCallArgumentSyntax) -> Syntax {
-        argumentListNode = node
-
         _ = TokenVisitor(self).visit(node)
-        extractFunctionCallExpressions(tokens)
+        parseFunctionCall(tokens)
+        parseSubscripting(tokens)
 
+        _ = TupleExpressionVisitor(self).visit(node)
+        _ = TupleElementVisitor(self).visit(node)
         _ = IdentifierExpressionVisitor(self).visit(node)
         _ = MemberAccessExpressionVisitor(self).visit(node)
         _ = LiteralExpressionVisitor(self).visit(node)
-//        _ = BinaryOperatorExpressionVisitor(self).visit(node)
+        _ = BinaryOperatorExpressionVisitor(self).visit(node)
 
         let assersionStatement = node.description.replacingOccurrences(of: "\"", with: "\\\"")
 
@@ -274,7 +239,7 @@ class ExpressionTransformer: SyntaxRewriter {
                 case .none: return \"nil\"
                 }
             }
-            var values = [(Int, String)]()
+            var valueColumns = [Int: String]()
             let condition = { () -> Bool in
                 \({ () -> String in
                     var recodValues = ""
@@ -282,18 +247,29 @@ class ExpressionTransformer: SyntaxRewriter {
                         let determiner = TokenColumnFinder(expression.children.flatMap { $0 as? TokenSyntax }.last!)
                         _ = determiner.visit(node)
                         if let column = determiner.column {
-                            recodValues += "values.append((\(offset + column), \"\\(toString(\(expression)))\"))\n"
+                            recodValues += "valueColumns[\(offset + column)] = \"\\(toString(\(expression)))\"\n"
                         }
                     }
-                    return recodValues
-                }())
-                \({ () -> String in
-                    var recodValues = ""
-                    for expression in expressionList {
+                    for expression in functionCallList {
                         let determiner = TokenColumnFinder(expression[expression.map {$0.text}.index(of: "(")! - 1])
                         _ = determiner.visit(node)
                         if let column = determiner.column {
-                            recodValues += "values.append((\(offset + column), \"\\(toString(\(expression.map { $0.description }.joined())))\"))\n"
+                            recodValues += "valueColumns[\(offset + column)] = \"\\(toString(\(expression.map { $0.description }.joined())))\"\n"
+                        }
+                    }
+                    for expression in subscriptingList {
+                        let determiner = TokenColumnFinder(expression[expression.map {$0.text}.index(of: "[")! - 1])
+                        _ = determiner.visit(node)
+                        if let column = determiner.column {
+                            recodValues += "valueColumns[\(offset + column)] = \"\\(toString(\(expression.map { $0.description }.joined())))\"\n"
+                        }
+                    }
+                    for (index, binaryOperator) in binaryOperators.enumerated() {
+                        let binaryOperatorExpression = binaryOperatorExpressions[index]
+                        let determiner = TokenColumnFinder(binaryOperator.children.flatMap { $0 as? TokenSyntax }[0])
+                        _ = determiner.visit(binaryOperatorExpression)
+                        if let column = determiner.column {
+                            recodValues += "valueColumns[\(offset + column)] = \"\\(toString(\(binaryOperatorExpression.description)))\"\n"
                         }
                     }
                     return recodValues
@@ -310,7 +286,7 @@ class ExpressionTransformer: SyntaxRewriter {
                     current += string.count
                 }
                 print(\"assert(\(assersionStatement))\")
-                values.sort { $0.0 < $1.0 }
+                var values = Array(valueColumns).sorted { $0.0 < $1.0 }
                 var current = 0
                 for value in values {
                     align(current: &current, column: value.0, string: \"|\")
@@ -342,6 +318,84 @@ class ExpressionTransformer: SyntaxRewriter {
         """
 
         return node
+    }
+
+    private func parseFunctionCall(_ tokens: [TokenSyntax]) {
+        var functionCallExpression = [TokenSyntax]()
+        var parens = [TokenSyntax]()
+        var index = 0
+        while index < tokens.count {
+            let token = tokens[index]
+
+            switch token.tokenKind {
+            case .identifier(_):
+                if let nextToken = index < tokens.count - 1 ? tokens[index + 1] : nil, case .leftParen = nextToken.tokenKind {
+                    if parens.isEmpty {
+                        functionCallExpression.append(token)
+                        functionCallExpression.append(nextToken)
+                        parens.append(nextToken)
+                        index += 2
+                        continue
+                    }
+                }
+            case .leftParen:
+                parens.append(token)
+            case .rightParen:
+                parens.removeLast()
+                if parens.isEmpty && !functionCallExpression.isEmpty {
+                    functionCallExpression.append(token)
+                    functionCalls.append(functionCallExpression)
+                    parseFunctionCall(Array(functionCallExpression.dropFirst().dropFirst().dropLast()))
+
+                    functionCallExpression.removeAll()
+                }
+            default:
+                break
+            }
+            if !functionCallExpression.isEmpty {
+                functionCallExpression.append(token)
+            }
+            index += 1
+        }
+    }
+
+    private func parseSubscripting(_ tokens: [TokenSyntax]) {
+        var subscriptingExpression = [TokenSyntax]()
+        var squareBrackets = [TokenSyntax]()
+        var index = 0
+        while index < tokens.count {
+            let token = tokens[index]
+
+            switch token.tokenKind {
+            case .identifier(_):
+                if let nextToken = index < tokens.count - 1 ? tokens[index + 1] : nil, case .leftSquareBracket = nextToken.tokenKind {
+                    if squareBrackets.isEmpty {
+                        subscriptingExpression.append(token)
+                        subscriptingExpression.append(nextToken)
+                        squareBrackets.append(nextToken)
+                        index += 2
+                        continue
+                    }
+                }
+            case .leftSquareBracket:
+                squareBrackets.append(token)
+            case .rightSquareBracket:
+                squareBrackets.removeLast()
+                if squareBrackets.isEmpty && !subscriptingExpression.isEmpty {
+                    subscriptingExpression.append(token)
+                    subscriptings.append(subscriptingExpression)
+                    parseFunctionCall(Array(subscriptingExpression.dropFirst().dropFirst().dropLast()))
+
+                    subscriptingExpression.removeAll()
+                }
+            default:
+                break
+            }
+            if !subscriptingExpression.isEmpty {
+                subscriptingExpression.append(token)
+            }
+            index += 1
+        }
     }
 
     class TokenVisitor: SyntaxRewriter {
@@ -380,10 +434,19 @@ class ExpressionTransformer: SyntaxRewriter {
         override func visit(_ node: MemberAccessExprSyntax) -> ExprSyntax {
             let expression = Array(node.children)
             if !expression.isEmpty, let token = expression.last as? TokenSyntax {
-                for functionCallExpression in transformer.functionCallExpressions where functionCallExpression.first == token {
+                for functionCall in transformer.functionCalls where functionCall.first == token {
                     let base = node.base.children.flatMap { $0 as? IdentifierExprSyntax }
-                    let expr = (base.isEmpty ? [] : base[0].children.flatMap { $0 as? TokenSyntax }) + node.base.children.flatMap { $0 as? TokenSyntax } + [SyntaxFactory.makeToken(.period, presence: .present)] + functionCallExpression
-                    transformer.expressionList.append(expr)
+                    let expr = (base.isEmpty ? [] : base[0].children.flatMap { $0 as? TokenSyntax }) + node.base.children.flatMap { $0 as? TokenSyntax } + [SyntaxFactory.makeToken(.period, presence: .present)] + functionCall
+                    transformer.functionCallList.append(expr)
+                    if let expression = expression[0] as? MemberAccessExprSyntax {
+                        return visit(expression)
+                    }
+                    return node
+                }
+                for subscripting in transformer.subscriptings where subscripting.first == token {
+                    let base = node.base.children.flatMap { $0 as? IdentifierExprSyntax }
+                    let expr = (base.isEmpty ? [] : base[0].children.flatMap { $0 as? TokenSyntax }) + node.base.children.flatMap { $0 as? TokenSyntax } + [SyntaxFactory.makeToken(.period, presence: .present)] + subscripting
+                    transformer.subscriptingList.append(expr)
                     if let expression = expression[0] as? MemberAccessExprSyntax {
                         return visit(expression)
                     }
@@ -395,6 +458,33 @@ class ExpressionTransformer: SyntaxRewriter {
                 return visit(expression)
             }
             transformer.expressions.append(node)
+            return node
+        }
+    }
+
+    class TupleExpressionVisitor: SyntaxRewriter {
+        private let transformer: ExpressionTransformer
+
+        init(_ transformer: ExpressionTransformer) {
+            self.transformer = transformer
+        }
+
+        override func visit(_ node: TupleExprSyntax) -> ExprSyntax {
+            transformer.expressions.append(node)
+            return node
+        }
+    }
+
+    class TupleElementVisitor: SyntaxRewriter {
+        private let transformer: ExpressionTransformer
+
+        init(_ transformer: ExpressionTransformer) {
+            self.transformer = transformer
+        }
+
+        override func visit(_ node: TupleElementSyntax) -> Syntax {
+            _ = MemberAccessExpressionVisitor(transformer).visit(node)
+            _ = IdentifierExpressionVisitor(transformer).visit(node)
             return node
         }
     }
@@ -440,7 +530,10 @@ class ExpressionTransformer: SyntaxRewriter {
         }
 
         override func visit(_ node: BinaryOperatorExprSyntax) -> ExprSyntax {
-            transformer.expressions.append(node)
+            if let parent = node.parent {
+                transformer.binaryOperators.append(node)
+                transformer.binaryOperatorExpressions.append(parent)
+            }
             return node
         }
     }

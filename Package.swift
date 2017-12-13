@@ -5,6 +5,9 @@ import PackageDescription
 
 let package = Package(
     name: "SwiftPowerAssert",
+    products: [
+        .executable(name: "swift-power-assert", targets: ["SwiftPowerAssert"])
+    ],
     dependencies: [
         .package(
             url: "https://github.com/kylef/Commander.git",

@@ -22,19 +22,18 @@ import SwiftSyntax
 public final class SwiftPowerAssert {
     private let sources: String
     private let output: String?
-    private let internalTest: Bool
+    private let testable: Bool
 
-    public init(sources: String, output: String? = nil, internalTest: Bool = false) {
+    public init(sources: String, output: String? = nil, testable: Bool = false) {
         self.sources = sources
         self.output = output
-        self.internalTest = internalTest
+        self.testable = testable
     }
 
     public func run() throws {
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: sources, isDirectory: &isDirectory) else {
-            print("No such file or directory")
-            throw Error.noSuchFileOrDirectory
+            throw SwiftPowerAssertError.noSuchFileOrDirectory
         }
 
         let testFileURLs: [URL]
@@ -54,10 +53,14 @@ public final class SwiftPowerAssert {
     }
 
     private func processFile(fileURL: URL) throws {
-        let file = try Syntax.parse(fileURL)
-
-        let instrumentor = Instrumentor(internalTest: internalTest)
-        let instrumented = try instrumentor.instrument(sourceFile: file)
+        let sourceFile: SourceFileSyntax
+        do {
+            sourceFile = try Syntax.parse(fileURL)
+        } catch let error {
+            throw SwiftPowerAssertError.parseError(fileURL: fileURL, description: error.localizedDescription)
+        }
+        
+        let instrumented = try Instrumentor(testable: testable).instrument(sourceFile: sourceFile)
 
         var isDirectory: ObjCBool = false
         if let output = output, FileManager.default.fileExists(atPath: output, isDirectory: &isDirectory) && isDirectory.boolValue {
@@ -68,9 +71,18 @@ public final class SwiftPowerAssert {
     }
 }
 
-public extension SwiftPowerAssert {
-    enum Error: Swift.Error {
-        case missingFileName
-        case noSuchFileOrDirectory
+enum SwiftPowerAssertError: Error {
+    case noSuchFileOrDirectory
+    case parseError(fileURL: URL, description: String)
+}
+
+extension SwiftPowerAssertError: CustomStringConvertible {
+    var description: String {
+        switch self {
+        case .noSuchFileOrDirectory:
+            return "No such file or directory"
+        case .parseError(let fileURL, let description):
+            return "Couldn't parse the given source file: \(fileURL)\n\(description)"
+        }
     }
 }
