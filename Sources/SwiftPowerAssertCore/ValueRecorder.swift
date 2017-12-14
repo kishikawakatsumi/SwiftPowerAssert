@@ -36,23 +36,8 @@ class ValueRecorder: SyntaxRewriter {
     private var binaryOperatorExpressions = [Syntax]()
 
     init(_ target: ExpressionStmtSyntax, testable: Bool = false) {
-        func removeNewline(expression: Syntax) -> Syntax {
-            class TokenVisitor: SyntaxRewriter {
-                func hasLeadingNewline(_ token: TokenSyntax) -> Bool {
-                    for piece in token.leadingTrivia { if case .newlines(_) = piece { return true } }
-                    return false
-                }
-
-                override func visit(_ token: TokenSyntax) -> Syntax {
-                    switch token.tokenKind {
-                    case .spacedBinaryOperator(_) where hasLeadingNewline(token): return token.withLeadingTrivia(.spaces(1))
-                    default: return token.withLeadingTrivia(.spaces(0))
-                    }
-                }
-            }
-            return TokenVisitor().visit(expression)
-        }
-        self.target = removeNewline(expression: target) as! ExpressionStmtSyntax
+        let formetter = Formatter()
+        self.target = formetter.format(expression: target) as! ExpressionStmtSyntax
         self.testable = testable
     }
 
