@@ -19,9 +19,8 @@
 import Foundation
 import SwiftSyntax
 
-class Instrumentor: SyntaxRewriter {
+class Instrumentor {
     let testable: Bool
-
     var injectionCode: String?
 
     init(testable: Bool = false) {
