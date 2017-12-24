@@ -28,13 +28,8 @@ What is `SwiftPowerAssert`?
 ### A Work In Progress
 SwiftPowerAssert is still in active development. Many expressions are unsupported and very unstable.
 
-Requirements
----------------------------------------
-SwiftPowerAssert requires [Swift 4.1 toolchains](https://swift.org/download/#snapshots).
-
 Installation
 ---------------------------------------
-Download and install [the latest trunk Swift development toolchain](https://swift.org/download/#snapshots).
 
 ```shell
 git clone https://github.com/kishikawakatsumi/SwiftPowerAssert

@@ -17,165 +17,511 @@
 ////////////////////////////////////////////////////////////////////////////
 
 import Foundation
-import SwiftSyntax
 
 class Instrumentor {
-    let testable: Bool
-    var injectionCode: String?
+    let source: String
+    let sourceIndices: [Int: Int]
 
-    init(testable: Bool = false) {
-        self.testable = testable
+    init(source: String) {
+        self.source = source
+        var sourceIndices = [Int: Int]()
+        var index = 0
+        var characterCount = 0
+        source.enumerateLines { (line, stop) in
+            let count = line.count
+            sourceIndices[index] = characterCount + count + 1
+            index += 1
+            characterCount += count + 1
+        }
+        self.sourceIndices = sourceIndices
     }
 
-    func instrument(sourceFile: SourceFileSyntax) throws -> Syntax {
-        var source: Syntax = sourceFile
-        let targets = collectInstrumentTargets(sourceFile: sourceFile)
-        for target in targets {
-            let recorder = ValueRecorder(target, testable: testable)
-            let code = recorder.recordValues()
-            let replacement = try parseInjectionCode(code)
-            source = replaceAssertCall(target: target, replacement: replacement, source: source)
+    func instrument(node: AST) -> String {
+        var instruments = [(SourceRange, String)]()
+
+        node.declarations.forEach {
+            switch $0 {
+            case .class(let declaration) where declaration.typeInheritance == "XCTestCase":
+                declaration.members.forEach {
+                    switch $0 {
+                    case .declaration(let declaration):
+                        switch declaration {
+                        case .function(let declaration):
+                            declaration.body.forEach {
+                                switch $0 {
+                                case .expression(let expression):
+                                    let source = instrument(functionCall: expression)
+                                    instruments.append((expression.range, source))
+                                case .declaration(_):
+                                    break
+                                }
+                            }
+                        default:
+                            break
+                        }
+                    }
+                }
+            default:
+                break
+            }
+        }
+
+        var instrumented = source
+        for instrument in instruments.reversed() {
+            let sourceLocation = instrument.0
+            let code = instrument.1
+
+            let startIndex: String.Index
+            if sourceLocation.start.line > 0 {
+                startIndex = source.index(source.startIndex, offsetBy: sourceIndices[sourceLocation.start.line - 1]! + sourceLocation.start.column)
+            } else {
+                startIndex = source.index(source.startIndex, offsetBy: sourceLocation.start.column)
+            }
+            let endIndex: String.Index
+            if sourceLocation.end.line > 0 {
+                endIndex = source.index(source.startIndex, offsetBy: sourceIndices[sourceLocation.end.line - 1]! + sourceLocation.end.column)
+            } else {
+                endIndex = source.index(source.startIndex, offsetBy: sourceLocation.end.column)
+            }
+
+            instrumented.replaceSubrange(startIndex...endIndex, with: code)
+        }
+
+        return instrumented
+    }
+
+    private func instrument(functionCall expression: Expression) -> String {
+        if expression.rawValue == "call_expr" {
+            if !expression.expressions.isEmpty, let decl = expression.expressions[0].decl, decl == "Swift.(file).assert(_:_:file:line:)" {
+                let code = instrument(expression)
+                return code
+            }
+        }
+        return expression.source
+    }
+
+    private func instrument(_ expression: Expression) -> String {
+        var values = [Int: String]()
+        let formatter = Formatter()
+        
+        traverse(expression) { (childExpression) in
+            if childExpression.source == expression.source || (childExpression.range.start.line == expression.range.start.line && childExpression.range.start.column == expression.range.start.column) {
+                return
+            }
+
+            if childExpression.rawValue == "declref_expr" && !childExpression.type.contains("->") {
+                let source = declarationReferenceExpression(childExpression, expression)
+                
+                let formatter = Formatter()
+                let tokens = formatter.tokenize(source: expression.source)
+                
+                let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
+                values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+            }
+            if childExpression.rawValue == "member_ref_expr" {
+                let source = memberReferenceExpression(childExpression, expression)
+
+                let formatter = Formatter()
+                let tokens = formatter.tokenize(source: expression.source)
+
+                let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
+                values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+            }
+            if childExpression.rawValue == "string_literal_expr" {
+                let source = stringLiteralExpression(childExpression, expression)
+
+                let formatter = Formatter()
+                let tokens = formatter.tokenize(source: expression.source)
+
+                let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
+                values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+            }
+            if childExpression.rawValue == "subscript_expr" {
+                let source = childExpression.source
+
+                let formatter = Formatter()
+                let tokens = formatter.tokenize(source: expression.source)
+
+                let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
+                values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+            }
+            if childExpression.rawValue == "call_expr" {
+                let source = callExpression(childExpression, expression)
+
+                let formatter = Formatter()
+                let tokens = formatter.tokenize(source: expression.source)
+
+                let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
+                values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+            }
+            if childExpression.rawValue == "binary_expr" {
+                let source = binaryExpression(childExpression, expression)
+
+                let formatter = Formatter()
+                let tokens = formatter.tokenize(source: expression.source)
+
+                let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
+                values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+            }
+        }
+
+        var recordValues = ""
+        for (key, value) in values {
+            recordValues += "valueColumns[\(key - 1)] = \"\\(toString(\(value)))\"\n"
+        }
+
+        let code =
+        """
+
+        do {
+        func toString<T>(_ value: T?) -> String {
+        switch value {
+        case .some(let v): return \"\\(v)\"
+        case .none: return \"nil\"
+        }
+        }
+        var valueColumns = [Int: String]()
+        let condition = { () -> Bool in
+        \(recordValues)
+        return \(formatter.format(tokens: formatter.tokenize(source: expression.expressions[1].source)))
+        }()
+        if !condition {
+        func align(current: inout Int, column: Int, string: String) {
+        while current < column {
+        print(\" \", terminator: \"\")
+        current += 1
+        }
+        print(string, terminator: \"\")
+        current += string.count
+        }
+        print(\"\(formatter.format(tokens: formatter.tokenize(source: expression.source)).replacingOccurrences(of: "\"", with: "\\\""))\")
+        var values = Array(valueColumns).sorted { $0.0 < $1.0 }
+        var current = 0
+        for value in values {
+        align(current: &current, column: value.0, string: \"|\")
+        }
+        print()
+        while !values.isEmpty {
+        var current = 0
+        var index = 0
+        while index < values.count {
+        if index == values.count - 1 || values[index].0 + values[index].1.count < values[index + 1].0 {
+        align(current: &current, column: values[index].0, string: values[index].1)
+        values.remove(at: index)
+        } else {
+        align(current: &current, column: values[index].0, string: \"|\")
+        index += 1
+        }
+        }
+        print()
+        }
+        }
+        }
+        """
+
+        return code
+    }
+
+    private func declarationReferenceExpression(_ child: Expression, _ parent: Expression) -> String {
+        var source = child.source
+        let rest = restOfExpression(child, parent)
+        for character in rest {
+            switch character {
+            case ".", ",", " ", "\t", "\n", "(", "[", "{", ")", "]", "}":
+                return source
+            default:
+                source += String(character)
+            }
         }
         return source
     }
 
-    private func parseInjectionCode(_ code: String) throws -> StmtSyntax {
-        class UnknownStatementVisitor: SyntaxRewriter {
-            var statement: StmtSyntax!
-
-            override func visit(_ node: UnknownStmtSyntax) -> StmtSyntax {
-                statement = node
-                return node
+    private func memberReferenceExpression(_ child: Expression, _ parent: Expression) -> String {
+        var source = child.source
+        let rest = restOfExpression(child, parent)
+        for character in rest {
+            switch character {
+            case ".", ",", " ", "\t", "\n", "(", "[", "{", ")", "]", "}":
+                return source
+            default:
+                source += String(character)
             }
         }
-
-        let tempDir = NSTemporaryDirectory() as NSString
-        let tempFileUrl = URL(fileURLWithPath: tempDir.appendingPathComponent("swift-power-assert-\(UUID().uuidString).swift"))
-        try code.write(to: tempFileUrl, atomically: true, encoding: .utf8)
-        let sourceFile = try Syntax.parse(tempFileUrl)
-        let statementVisitor = UnknownStatementVisitor()
-        _ = statementVisitor.visit(sourceFile)
-        return statementVisitor.statement
+        return source
     }
 
-    private func replaceAssertCall(target: StmtSyntax, replacement: StmtSyntax, source: Syntax) -> Syntax {
-        class ExpressionStatementVisitor: SyntaxRewriter {
-            let target: StmtSyntax
-            let replacement: StmtSyntax
-
-            init(_ target: StmtSyntax, _ replacement: StmtSyntax) {
-                self.target = target
-                self.replacement = replacement
+    private func binaryExpression(_ child: Expression, _ parent: Expression) -> String {
+        var source = child.source
+        let rest = restOfExpression(child, parent)
+        for character in rest {
+            switch character {
+            case ".", ",", " ", "\t", "\n", "(", "[", "{", ")", "]", "}":
+                return source
+            default:
+                source += String(character)
             }
+        }
+        return source
+    }
 
-            override func visit(_ node: ExpressionStmtSyntax) -> StmtSyntax {
-                if node.description == target.description {
-                    return replacement
+    private func callExpression(_ child: Expression, _ parent: Expression) -> String {
+        var source = child.source
+        let rest = restOfExpression(child, parent)
+        for character in rest {
+            switch character {
+            case ".", ",", " ", "\t", "\n", "(", "[", "{", ")", "]", "}":
+                return source
+            default:
+                source += String(character)
+            }
+        }
+        return source
+    }
+
+    private func stringLiteralExpression(_ child: Expression, _ parent: Expression) -> String {
+        var source = child.source
+        let rest = restOfExpression(child, parent)
+        var previous = ""
+        for character in rest {
+            switch character {
+            case "\"" where previous != "\\":
+                source += String(character)
+                return source
+            default:
+                previous = String(character)
+                source += previous
+            }
+        }
+        return source
+    }
+
+    private func traverse(_ expression: Expression, closure: (_ expression: Expression) -> ()) {
+        closure(expression)
+        for expression in expression.expressions {
+            traverse(expression, closure: closure)
+        }
+    }
+
+    private func restOfExpression(_ child: Expression, _ parent: Expression) -> String {
+        let startIndex: String.Index
+        if child.range.end.line > 0 {
+            startIndex = source.index(source.startIndex, offsetBy: sourceIndices[child.range.end.line - 1]! + child.range.end.column)
+        } else {
+            startIndex = source.index(source.startIndex, offsetBy: child.range.end.column)
+        }
+        let endIndex: String.Index
+        if parent.range.end.line > 0 {
+            endIndex = source.index(source.startIndex, offsetBy: sourceIndices[parent.range.end.line - 1]! + parent.range.end.column)
+        } else {
+            endIndex = source.index(source.startIndex, offsetBy: parent.range.end.column)
+        }
+
+        return String(source[startIndex...endIndex])
+    }
+
+    private func columnInFunctionCall(column: Int, startLine: Int, endLine: Int, tokens: [Formatter.Token], child: Expression, parent: Expression) -> Int {
+        var columnIndex = 0
+        let endLineIndex = endLine - parent.range.start.line
+
+        var lineIndex = 0
+
+        var indent = 0
+        if parent.range.start.line == endLine {
+            indent = parent.range.start.column
+        }
+
+        loop: for token in tokens {
+            switch token.type {
+            case .token, .string:
+                if lineIndex < endLineIndex {
+                    columnIndex += token.value.count
+                } else if lineIndex == endLineIndex {
+                    columnIndex += column
+                    break loop
                 }
-                return node
+            case .indent(let count):
+                if lineIndex == endLineIndex {
+                    indent += count
+                    columnIndex += column
+                    break loop
+                }
+            case .newline:
+                columnIndex += 1
+                lineIndex += 1
             }
         }
-        return ExpressionStatementVisitor(target, replacement).visit(source)
+
+        return columnIndex - indent
     }
 
-    private func collectInstrumentTargets(sourceFile: SourceFileSyntax) -> [ExpressionStmtSyntax] {
-        var targets = [ExpressionStmtSyntax]()
-        let declarations = collectDeclarations(sourceFile)
-        for declaration in declarations {
-            let testCases = collectTestCases(declaration)
-            for testCase in testCases {
-                let testFunctions = collectTestFunctions(testCase)
-                for testFunction in testFunctions {
-                    let assertCalls = collectAssertCalls(testFunction)
-                    targets.append(contentsOf: assertCalls)
+    class Formatter {
+        class State {
+            enum Mode {
+                case plain
+                case token
+                case string
+                case stringEscape
+                case newline
+                case indent
+            }
+
+            var mode = Mode.plain
+            var tokens = [Token]()
+            var storage = ""
+            var input: String
+
+            init(input: String) {
+                self.input = input
+            }
+        }
+
+        func tokenize(source: String) -> [Token] {
+            let state = State(input: source)
+            for character in state.input {
+                switch state.mode {
+                case .plain:
+                    switch character {
+                    case "\"":
+                        state.mode = .string
+                        state.storage = "\""
+                    case "\n":
+                        state.tokens.append(Token(type: .newline, value: String(character)))
+                        state.mode = .newline
+                    case "(", ")", "[", "]", "{", "}", ",", ".", ":", ";":
+                        state.tokens.append(Token(type: .token, value: String(character)))
+                    case " ", "\t":
+                        state.tokens.append(Token(type: .token, value: " "))
+                    default:
+                        state.mode = .token
+                        state.storage = String(character)
+                    }
+                case .token:
+                    switch character {
+                    case "\"":
+                        state.tokens.append(Token(type: .token, value: state.storage + "\""))
+                        state.mode = .string
+                        state.storage = ""
+                    case " ":
+                        state.tokens.append(Token(type: .token, value: state.storage))
+                        state.tokens.append(Token(type: .token, value: " "))
+                        state.mode = .plain
+                        state.storage = ""
+                    case "\n":
+                        state.tokens.append(Token(type: .token, value: state.storage))
+                        state.tokens.append(Token(type: .newline, value: "\n"))
+                        state.mode = .newline
+                        state.storage = ""
+                    case "(", ")", "[", "]", "{", "}", ",", ".", ":", ";":
+                        state.tokens.append(Token(type: .token, value: state.storage))
+                        state.tokens.append(Token(type: .token, value: String(character)))
+                        state.storage = ""
+                    default:
+                        state.storage += String(character)
+                    }
+                case .string:
+                    switch character {
+                    case "\"":
+                        state.tokens.append(Token(type: .string, value: state.storage + "\""))
+                        state.mode = .plain
+                        state.storage = ""
+                    case "\\":
+                        state.mode = .stringEscape
+                    default:
+                        state.storage += String(character)
+                    }
+                case .stringEscape:
+                    switch character {
+                    case "\"", "\\":
+                        state.mode = .string
+                        state.storage += String(character)
+                    case "n":
+                        state.mode = .string
+                        state.storage += "\n"
+                    case "t":
+                        state.mode = .string
+                        state.storage += "\t"
+                    default:
+                        fatalError("unexpected '\(character)' in string escape")
+                    }
+                case .indent:
+                    switch character {
+                    case " ", "\t":
+                        state.storage += " "
+                    case "\n":
+                        state.tokens.append(Token(type: .indent(state.storage.count), value: state.storage))
+                        state.tokens.append(Token(type: .newline, value: String(character)))
+                        state.mode = .newline
+                        state.storage = ""
+                    case "(", ")", "[", "]", "{", "}", ",", ".", ":", ";":
+                        state.tokens.append(Token(type: .indent(state.storage.count), value: state.storage))
+                        state.tokens.append(Token(type: .token, value: String(character)))
+                        state.mode = .plain
+                        state.storage = ""
+                    default:
+                        state.tokens.append(Token(type: .indent(state.storage.count), value: state.storage))
+                        state.mode = .token
+                        state.storage = String(character)
+                    }
+                case .newline:
+                    switch character {
+                    case " ", "\t":
+                        state.mode = .indent
+                        state.storage = String(character)
+                    case "(", ")", "[", "]", "{", "}", ",", ".", ":", ";":
+                        state.tokens.append(Token(type: .token, value: String(character)))
+                        state.mode = .plain
+                    case "\n":
+                        state.tokens.append(Token(type: .newline, value: String(character)))
+                    default:
+                        state.mode = .token
+                        state.storage = String(character)
+                    }
                 }
             }
-        }
-        return targets
-    }
-
-    private func collectDeclarations(_ sourceFile: SourceFileSyntax) -> [DeclarationStmtSyntax] {
-        let declarationStatementVisitor = DeclarationStatementVisitor()
-        _ = declarationStatementVisitor.visit(sourceFile)
-        return declarationStatementVisitor.declarations
-    }
-
-    private func collectTestCases(_ node: DeclarationStmtSyntax) -> [DeclarationStmtSyntax] {
-        let typeInheritanceClauseVisitor = TypeInheritanceClauseVisitor(node)
-        _ = typeInheritanceClauseVisitor.visit(node)
-        return typeInheritanceClauseVisitor.testCases
-    }
-
-    private func collectTestFunctions(_ node: DeclarationStmtSyntax) -> [DeclListSyntax] {
-        let tokenVisitor = TokenVisitor()
-        _ = tokenVisitor.visit(node)
-        return tokenVisitor.testFunctions
-    }
-
-    private func collectAssertCalls(_ node: DeclListSyntax) -> [ExpressionStmtSyntax] {
-        let expressionStatementVisitor = ExpressionStatementVisitor()
-        _ = expressionStatementVisitor.visit(node)
-        return expressionStatementVisitor.assertCalls
-    }
-
-    private class DeclarationStatementVisitor: SyntaxRewriter {
-        var declarations = [DeclarationStmtSyntax]()
-
-        override func visit(_ node: DeclarationStmtSyntax) -> StmtSyntax {
-            declarations.append(node)
-            return node
-        }
-    }
-
-    private class TypeInheritanceClauseVisitor: SyntaxRewriter {
-        var declaration: DeclarationStmtSyntax
-        var testCases = [DeclarationStmtSyntax]()
-
-        init(_ declaration: DeclarationStmtSyntax) {
-            self.declaration = declaration
-        }
-
-        override func visit(_ node: TypeInheritanceClauseSyntax) -> Syntax {
-            for inheritedType in node.inheritedTypeCollection where !(inheritedType.typeName.children.flatMap { $0 as? TokenSyntax }.filter { $0.text == "XCTestCase" }.isEmpty) {
-                testCases.append(declaration)
-                return node
-            }
-            return node
-        }
-    }
-
-    private class TokenVisitor: SyntaxRewriter {
-        var testFunctions = [DeclListSyntax]()
-
-        override func visit(_ token: TokenSyntax) -> Syntax {
-            if case .funcKeyword = token.tokenKind, let sibling = token.parent?.child(at: token.indexInParent + 1) as? TokenSyntax,
-                case .identifier = sibling.tokenKind, sibling.text.hasPrefix("test"), let testFunction = token.parent?.parent as? DeclListSyntax {
-                testFunctions.append(testFunction)
-            }
-            return token
-        }
-    }
-
-    private class ExpressionStatementVisitor: SyntaxRewriter {
-        var assertCalls = [ExpressionStmtSyntax]()
-
-        override func visit(_ node: ExpressionStmtSyntax) -> StmtSyntax {
-            let identifierExpressionVisitor = IdentifierExpressionVisitor()
-            _ = identifierExpressionVisitor.visit(node)
-
-            assertCalls.append(contentsOf: identifierExpressionVisitor.assertCalls)
-            return node
-        }
-
-        class IdentifierExpressionVisitor: SyntaxRewriter {
-            var assertCalls = [ExpressionStmtSyntax]()
-
-            override func visit(_ node: IdentifierExprSyntax) -> ExprSyntax {
-                if node.identifier.text == "assert", let sibling = node.parent?.child(at: node.indexInParent + 1) as? TokenSyntax,
-                    case sibling.tokenKind = TokenKind.leftParen, let parent = node.parent?.parent as? ExpressionStmtSyntax {
-                    assertCalls.append(parent)
+            if !state.storage.isEmpty {
+                switch state.mode {
+                case .indent:
+                    state.tokens.append(Token(type: .indent(state.storage.count), value: state.storage))
+                case .newline:
+                    state.tokens.append(Token(type: .newline, value: state.storage))
+                case .string:
+                    state.tokens.append(Token(type: .string, value: state.storage))
+                default:
+                    state.tokens.append(Token(type: .token, value: state.storage))
                 }
-                return node
+            }
+            return state.tokens
+        }
+
+        func format(tokens: [Token]) -> String {
+            var formatted = ""
+            for token in tokens {
+                switch token.type {
+                case .token, .string:
+                    formatted += token.value
+                case .indent(_):
+                    break
+                case .newline:
+                    formatted += " "
+                }
+            }
+            return formatted
+        }
+
+        class Token {
+            enum TokenType {
+                case token
+                case string
+                case indent(Int)
+                case newline
+            }
+
+            var type: TokenType
+            var value: String
+
+            init(type: TokenType, value: String) {
+                self.type = type
+                self.value = value
             }
         }
     }

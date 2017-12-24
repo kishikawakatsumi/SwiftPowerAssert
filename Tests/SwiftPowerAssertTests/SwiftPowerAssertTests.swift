@@ -22,7 +22,7 @@ import SwiftPowerAssertCore
 struct TestRunner {
     func run(source: String, identifier: String = #function) throws -> String {
         let temporaryDirectory = NSTemporaryDirectory()
-        let sourceFilePath = (temporaryDirectory as NSString).appendingPathComponent("SwiftPowerAssertTests-\(identifier).swift")
+        let sourceFilePath = (temporaryDirectory as NSString).appendingPathComponent("com.kishikawakatsumi.swift-power-assert-tests-\(identifier)-\(UUID().uuidString).swift")
         let executablePath = (sourceFilePath as NSString).deletingPathExtension + "o"
 
         try source.write(toFile: sourceFilePath, atomically: true, encoding: .utf8)
@@ -67,7 +67,7 @@ class SwiftPowerAssertTests: XCTestCase {
             import XCTest
 
             struct Bar {
-                var foo: Foo
+                let foo: Foo
                 var val: Int
             }
 
@@ -76,7 +76,7 @@ class SwiftPowerAssertTests: XCTestCase {
             }
 
             class Tests: XCTestCase {
-                func testMethod() {
+                @objc dynamic func testMethod() {
                     let bar = Bar(foo: Foo(val: 2), val: 3)
                     assert(bar.val == bar.foo.val)
                 }
@@ -343,13 +343,13 @@ class SwiftPowerAssertTests: XCTestCase {
 
         let expected = """
             assert((object.types[index] as! Person).name == bob.name)
-                    |      |     |                | |    |  |   |
-                    |      |     7                | |    |  |   bob
-                    |      |                      | |    |  Person(name: "bob", age: 5)
-                    |      |                      | |    false
-                    |      |                      | alice
-                    |      |                      Person(name: "alice", age: 3)
-                    |      Person(name: "alice", age: 3)
+                    |      |     |    |             |    |  |   |
+                    |      |     7    |             |    |  |   bob
+                    |      |          |             |    |  Person(name: "bob", age: 5)
+                    |      |          |             |    false
+                    |      |          |             alice
+                    |      |          Person(name: "alice", age: 3)
+                    |      [Optional("string"), Optional(98.599999999999994), Optional(true), Optional(false), nil, Optional(nan), Optional(inf), Optional(main.Person(name: "alice", age: 3))]
                     Object(types: [Optional("string"), Optional(98.599999999999994), Optional(true), Optional(false), nil, Optional(nan), Optional(inf), Optional(main.Person(name: "alice", age: 3))])
 
             """
@@ -358,39 +358,115 @@ class SwiftPowerAssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testNewlineInAssert() throws {
+    func testMultilineExpression1() throws {
         let source = """
             import XCTest
 
-            class Tests: XCTestCase {
-                func testMethod() {
-                    let zero = 0
-                    let one = 1
-                    let two = 2
-                    let three = 3
+            struct Bar {
+                let foo: Foo
+                var val: Int
+            }
 
-                    let array = [one, two, three]
-                    assert(array
-                               .distance(from: 2, to: 3)
-                               == 4)
+            struct Foo {
+                var val: Int
+            }
+
+            class Tests: XCTestCase {
+                @objc dynamic func testMethod() {
+                    let bar = Bar(foo: Foo(val: 2), val: 3)
+                    assert(bar.val == bar.foo.val)
+                    assert(bar
+                        .val ==
+                        bar.foo.val)
+                    assert(bar
+                        .val ==
+                        bar
+                            .foo        .val)
                 }
             }
 
             Tests().testMethod()
             """
 
-        /* FIXME
-         The value of `distance(from:to:)` should be printed
-         assert(array.distance(from: 2, to: 3) == 4)
-                |     |              |      |  |  |
-                |     1              2      3  |  4
-                [1, 2, 3]                      false
-         */
         let expected = """
-            assert(array.distance(from: 2, to: 3) == 4)
-                   |                    |      |  |  |
-                   [1, 2, 3]            2      3  |  4
-                                                  false
+            assert(bar.val == bar.foo.val)
+                   |   |   |  |   |   |
+                   |   3   |  |   |   2
+                   |       |  |   Foo(val: 2)
+                   |       |  Bar(foo: main.Foo(val: 2), val: 3)
+                   |       false
+                   Bar(foo: main.Foo(val: 2), val: 3)
+            assert(bar .val == bar.foo.val)
+                   |    |   |  |   |   |
+                   |    3   |  |   |   2
+                   |        |  |   Foo(val: 2)
+                   |        |  Bar(foo: main.Foo(val: 2), val: 3)
+                   |        false
+                   Bar(foo: main.Foo(val: 2), val: 3)
+            assert(bar .val == bar .foo        .val)
+                   |    |   |  |    |           |
+                   |    3   |  |    Foo(val: 2) 2
+                   |        |  Bar(foo: main.Foo(val: 2), val: 3)
+                   |        false
+                   Bar(foo: main.Foo(val: 2), val: 3)
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
+    func testMultilineExpression2() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                @objc dynamic func testMethod() {
+                    let zero = 0
+                    let one = 1
+                    let two = 2
+                    let three = 3
+                    let array = [one, two, three]
+
+                    assert(array    .        index(
+                        of:    zero)
+                        == two
+                    )
+
+                    assert(array
+                        .
+                        index(
+
+                            of:
+                            zero)
+                        == two
+                    )
+
+                    assert(array
+                        .index(
+                            of:
+                            zero)
+                        == two
+                    )
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert(array    .        index( of:    zero) == two )
+                   |                 |             |     |  |
+                   [1, 2, 3]         nil           0     |  2
+                                                         false
+            assert(array . index(  of: zero) == two )
+                   |       |           |     |  |
+                   |       nil         0     |  2
+                   [1, 2, 3]                 false
+            assert(array .index( of: zero) == two )
+                   |      |          |     |  |
+                   |      nil        0     |  2
+                   [1, 2, 3]               false
 
             """
 

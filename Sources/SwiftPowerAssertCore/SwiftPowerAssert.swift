@@ -17,7 +17,6 @@
 ////////////////////////////////////////////////////////////////////////////
 
 import Foundation
-import SwiftSyntax
 
 public final class SwiftPowerAssert {
     private let sources: String
@@ -53,20 +52,46 @@ public final class SwiftPowerAssert {
     }
 
     private func processFile(fileURL: URL) throws {
-        let sourceFile: SourceFileSyntax
-        do {
-            sourceFile = try Syntax.parse(fileURL)
-        } catch let error {
-            throw SwiftPowerAssertError.parseError(fileURL: fileURL, description: error.localizedDescription)
-        }
-        
-        let instrumented = try Instrumentor(testable: testable).instrument(sourceFile: sourceFile)
+        let compile = Process()
+        let pipe = Pipe()
+        compile.standardError = pipe
+        compile.launchPath = "/usr/bin/xcrun"
+        compile.arguments = [
+            "swift",
+            "-frontend",
+            "-c",
+            fileURL.path,
+            "-target",
+            "x86_64-apple-macosx10.10",
+            "-enable-objc-interop",
+            "-sdk",
+            "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.13.sdk",
+            "-F",
+            "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+            "-Onone",
+            "-dump-ast"
+        ]
+        compile.launch()
+
+        let result = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)!
+
+        let tokenizer = Tokenizer()
+        let tokens = tokenizer.tokenize(source: result)
+
+        let lexer = Lexer()
+        let node = lexer.lex(tokens: tokens)
+
+        let parser = Parser()
+        let root = parser.parse(root: node)
+
+        let instrumentor = Instrumentor(source: try String(contentsOf: fileURL))
+        let source = instrumentor.instrument(node: root)
 
         var isDirectory: ObjCBool = false
         if let output = output, FileManager.default.fileExists(atPath: output, isDirectory: &isDirectory) && isDirectory.boolValue {
-            try "\(instrumented)".write(to: URL(fileURLWithPath: output).appendingPathComponent(fileURL.lastPathComponent), atomically: true, encoding: .utf8)
+            try source.write(to: URL(fileURLWithPath: output).appendingPathComponent(fileURL.lastPathComponent), atomically: true, encoding: .utf8)
         } else {
-            try "\(instrumented)".write(to: fileURL, atomically: true, encoding: .utf8)
+            try! source.write(to: fileURL, atomically: true, encoding: .utf8)
         }
     }
 }
