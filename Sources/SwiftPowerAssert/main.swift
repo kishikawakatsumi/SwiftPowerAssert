@@ -43,4 +43,3 @@ let generate = command(
 let group = Group()
 group.addCommand("instrument", "Instrument power-assert feature into the code.", generate)
 group.run()
-
