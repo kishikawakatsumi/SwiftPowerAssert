@@ -482,4 +482,178 @@ class SwiftPowerAssertTests: XCTestCase {
         let result = try TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
+
+    func testMultilineExpression3() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let zero = 0
+                    let one = 1
+                    let two = 2
+                    let three = 3
+
+                    let array = [one, two, three]
+                    assert(array
+                        .description
+                        .hasPrefix(    \"[\"
+                        )
+                        == false && array
+                            .description
+                            .hasPrefix    (\"Hello\"    ) ==
+                        true)
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert(array .description .hasPrefix(    "[" ) == false && array .description .hasPrefix    ("Hello"    ) == true)
+                   |      |            |             |     |  |     |  |      |            |             |            |  |
+                   |      [1, 2, 3]    true          [     |  false |  |      [1, 2, 3]    false         Hello        |  true
+                   [1, 2, 3]                               false    |  [1, 2, 3]                                      false
+                                                                    false
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
+    func testMultilineExpression4() throws {
+        let source = """
+            import XCTest
+
+            struct Bar {
+                var foo: Foo
+                var val: Int
+            }
+
+            struct Foo {
+                var val: Int
+            }
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let zero = 0
+                    let one = 1
+                    let two = 2
+                    let three = 3
+
+                    let array = [one, two, three]
+
+                    let bar = Bar(foo: Foo(val: 2), val: 3)
+
+                    assert(
+
+                        array.index(
+                            of: zero
+                            )
+                            ==
+                            two
+                            &&
+                            bar
+                                .val
+                            == bar
+                                .foo
+                                .val
+                    )
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert(  array.index( of: zero ) == two && bar .val == bar .foo .val )
+                     |     |          |      |  |   |  |    |   |  |    |    |
+                     |     nil        0      |  2   |  |    3   |  |    |    2
+                     [1, 2, 3]               false  |  |        |  |    Foo(val: 2)
+                                                    |  |        |  Bar(foo: main.Foo(val: 2), val: 3)
+                                                    |  |        false
+                                                    |  Bar(foo: main.Foo(val: 2), val: 3)
+                                                    false
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
+    func testMultilineExpression5() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let zero = 0
+                    let one = 1
+                    let two = 2
+                    let three = 3
+
+                    let array = [one, two, three]
+                    assert(
+
+                        array
+                            .distance(
+                                from: 2,
+                                to: 3)
+                            == 4)
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert(  array .distance( from: 2, to: 3) == 4)
+                     |      |               |      |  |  |
+                     |      1               2      3  |  4
+                     [1, 2, 3]                        false
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
+    func testMultilineExpression6() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let zero = 0
+                    let one = 1
+                    let two = 2
+                    let three = 3
+
+                    let index = 1
+
+                    let array = [one, two, three]
+
+                    assert([one,
+                            two
+                        , three]
+                        .count
+                        == 10)
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert([one, two , three] .count == 10)
+                    |    |     |       |     |  |
+                    1    2     3       3     |  10
+                                             false
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
 }
