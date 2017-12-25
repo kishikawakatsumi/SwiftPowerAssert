@@ -9,13 +9,12 @@ let package = Package(
         .executable(name: "swift-power-assert", targets: ["SwiftPowerAssert"])
     ],
     dependencies: [
-        .package(url: "https://github.com/kylef/Commander.git", from: "0.0.0"),
         .package(url: "https://github.com/apple/swift-package-manager.git", from: "0.0.0")
     ],
     targets: [
         .target(
             name: "SwiftPowerAssert",
-            dependencies: ["SwiftPowerAssertCore", "Commander", "Utility"]
+            dependencies: ["SwiftPowerAssertCore", "Utility"]
         ),
         .target(
             name: "SwiftPowerAssertCore",
