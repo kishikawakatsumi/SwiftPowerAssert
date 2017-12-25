@@ -21,12 +21,12 @@ import Foundation
 public final class SwiftPowerAssert {
     private let sources: String
     private let output: String?
-    private let testable: Bool
+    private let options: Options
 
-    public init(sources: String, output: String? = nil, testable: Bool = false) {
+    public init(sources: String, output: String? = nil, options: Options = Options()) {
         self.sources = sources
         self.output = output
-        self.testable = testable
+        self.options = options
     }
 
     public func run() throws {
@@ -52,22 +52,23 @@ public final class SwiftPowerAssert {
     }
 
     private func processFile(fileURL: URL) throws {
+        let sdk = options.sdk
+        let sdkPath = sdk.path
+        let target = "\(options.arch)-apple-\(options.sdk)\(options.deploymentTarget)"
+
         let compile = Process()
         let pipe = Pipe()
         compile.standardError = pipe
         compile.launchPath = "/usr/bin/xcrun"
         compile.arguments = [
-            "swift",
-            "-frontend",
-            "-c",
+            "swiftc",
             fileURL.path,
             "-target",
-            "x86_64-apple-macosx10.10",
-            "-enable-objc-interop",
+            target,
             "-sdk",
-            "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.13.sdk",
+            sdkPath,
             "-F",
-            "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+            "\(sdkPath)/../../../Developer/Library/Frameworks",
             "-Onone",
             "-dump-ast"
         ]
@@ -110,4 +111,43 @@ extension SwiftPowerAssertError: CustomStringConvertible {
             return "Couldn't parse the given source file: \(fileURL)\n\(description)"
         }
     }
+}
+
+public struct Options {
+    public let sdk = SDK.macosx
+    public let arch = Arch.x86_64
+    public let deploymentTarget = "10.10"
+    public let testable: Bool = false
+
+    public init() {}
+}
+
+public enum SDK: String {
+    case macosx
+    case iphoneos
+    case iphonesimulator
+    case appletvos
+    case appletvsimulator
+    case watchos
+    case watchsimulator
+
+    public var path: String {
+        let shell = Process()
+        shell.launchPath = "/usr/bin/xcrun"
+        shell.arguments = [
+            "--sdk",
+            "\(self)",
+            "--show-sdk-path"
+        ]
+        let pipe = Pipe()
+        shell.standardOutput = pipe
+        shell.launch()
+
+        return String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)!.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+public enum Arch: String {
+    case x86_64
+    case i386
 }

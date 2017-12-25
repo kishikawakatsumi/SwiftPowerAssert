@@ -217,6 +217,7 @@ class Instrumentor {
         }
         }
         }
+        
         """
 
         return code
