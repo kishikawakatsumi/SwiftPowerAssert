@@ -16,30 +16,35 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+import Foundation
+import Utility
 import SwiftPowerAssertCore
-import Commander
 
-struct CommanderArguments {
-    static let sources = Argument<String>("sources", description: "file or directory")
-}
+do {
+    let parser = ArgumentParser(commandName: "swift-power-assert", usage: "filename [--input naughty_words.txt]", overview: "Swearcheck checks a file of code for swearing, because let's face it: you were angry coding last night.")
+    let instrument = parser.add(subparser: "instrument", overview: "Instrument test files.")
+    let sources = instrument.add(positional: "sources", kind: String.self, optional: false, usage: "file or directory")
+    let output = instrument.add(option: "--output", shortName: "-o", kind: String.self, usage: "A filename containing naughty words in your language")
 
-struct CommanderOptions {
-    static let output = Option("output", default: "", description: "file or directory")
-}
+    let args = Array(CommandLine.arguments.dropFirst())
+    let result = try parser.parse(args)
 
-let generate = command(
-    CommanderArguments.sources,
-    CommanderOptions.output
-) { sources, output in
+    guard let input = result.get(sources) else {
+        throw ArgumentParserError.expectedArguments(parser, ["sources"])
+    }
+
     let runner: SwiftPowerAssert
-    if output.isEmpty {
-        runner = SwiftPowerAssert(sources: sources)
+    if let output = result.get(output) {
+        runner = SwiftPowerAssert(sources: input, output: output)
     } else {
-        runner = SwiftPowerAssert(sources: sources, output: output)
+        runner = SwiftPowerAssert(sources: input)
     }
     try runner.run()
+} catch ArgumentParserError.expectedValue(let value) {
+    print("Missing value for argument \(value).")
+} catch ArgumentParserError.expectedArguments(_, let stringArray) {
+    print("Missing arguments: \(stringArray.joined()).")
+} catch {
+    print(error.localizedDescription)
 }
 
-let group = Group()
-group.addCommand("instrument", "Instrument power-assert feature into the code.", generate)
-group.run()
