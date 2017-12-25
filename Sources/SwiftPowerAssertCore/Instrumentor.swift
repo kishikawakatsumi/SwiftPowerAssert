@@ -125,7 +125,12 @@ class Instrumentor {
                 let tokens = formatter.tokenize(source: expression.source)
 
                 let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
-                values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+
+                if source.hasPrefix(".") {
+                    values[column] = childExpression.type + formatter.format(tokens: formatter.tokenize(source: source))
+                } else {
+                    values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+                }
             }
             if childExpression.rawValue == "string_literal_expr" {
                 let source = stringLiteralExpression(childExpression, expression)
@@ -152,7 +157,13 @@ class Instrumentor {
                 let tokens = formatter.tokenize(source: expression.source)
 
                 let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
-                values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+
+                // FIXME
+                if !childExpression.expressions.isEmpty && childExpression.expressions[0].type.contains("throws") {
+                    values[column] = "try! " + formatter.format(tokens: formatter.tokenize(source: source))
+                } else {
+                    values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+                }
             }
             if childExpression.rawValue == "binary_expr" {
                 let source = binaryExpression(childExpression, expression)
@@ -160,8 +171,15 @@ class Instrumentor {
                 let formatter = Formatter()
                 let tokens = formatter.tokenize(source: expression.source)
 
+                var containsThrowsFunction = false
+                traverse(childExpression) {
+                    guard !containsThrowsFunction else { return }
+                    containsThrowsFunction = $0.type.contains("throws") // FIXME: It should check 'throws' or 'nothrow' in 'call_expr'
+                }
+
+                // FIXME
                 let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
-                values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+                values[column] = (containsThrowsFunction ? "try! " : "") + formatter.format(tokens: formatter.tokenize(source: source))
             }
         }
 
@@ -194,7 +212,7 @@ class Instrumentor {
         print(string, terminator: \"\")
         current += string.count
         }
-        print(\"\(formatter.format(tokens: formatter.tokenize(source: expression.source)).replacingOccurrences(of: "\"", with: "\\\""))\")
+        print(\"\(formatter.escaped(tokens: formatter.tokenize(source: expression.source)))\")
         var values = Array(valueColumns).sorted { $0.0 < $1.0 }
         var current = 0
         for value in values {
@@ -333,9 +351,16 @@ class Instrumentor {
 
         loop: for token in tokens {
             switch token.type {
-            case .token, .string:
+            case .token:
                 if lineIndex < endLineIndex {
                     columnIndex += token.value.count
+                } else if lineIndex == endLineIndex {
+                    columnIndex += column
+                    break loop
+                }
+            case .string:
+                if lineIndex < endLineIndex {
+                    columnIndex += ("\"" + token.value + "\"").count
                 } else if lineIndex == endLineIndex {
                     columnIndex += column
                     break loop
@@ -384,7 +409,6 @@ class Instrumentor {
                     switch character {
                     case "\"":
                         state.mode = .string
-                        state.storage = "\""
                     case "\n":
                         state.tokens.append(Token(type: .newline, value: String(character)))
                         state.mode = .newline
@@ -399,7 +423,7 @@ class Instrumentor {
                 case .token:
                     switch character {
                     case "\"":
-                        state.tokens.append(Token(type: .token, value: state.storage + "\""))
+                        state.tokens.append(Token(type: .token, value: state.storage))
                         state.mode = .string
                         state.storage = ""
                     case " ":
@@ -415,6 +439,7 @@ class Instrumentor {
                     case "(", ")", "[", "]", "{", "}", ",", ".", ":", ";":
                         state.tokens.append(Token(type: .token, value: state.storage))
                         state.tokens.append(Token(type: .token, value: String(character)))
+                        state.mode = .plain
                         state.storage = ""
                     default:
                         state.storage += String(character)
@@ -422,7 +447,7 @@ class Instrumentor {
                 case .string:
                     switch character {
                     case "\"":
-                        state.tokens.append(Token(type: .string, value: state.storage + "\""))
+                        state.tokens.append(Token(type: .string, value: state.storage))
                         state.mode = .plain
                         state.storage = ""
                     case "\\":
@@ -434,7 +459,7 @@ class Instrumentor {
                     switch character {
                     case "\"", "\\":
                         state.mode = .string
-                        state.storage += String(character)
+                        state.storage += "\\" + String(character)
                     case "n":
                         state.mode = .string
                         state.storage += "\n"
@@ -446,6 +471,10 @@ class Instrumentor {
                     }
                 case .indent:
                     switch character {
+                    case "\"":
+                        state.tokens.append(Token(type: .indent(state.storage.count), value: state.storage))
+                        state.mode = .string
+                        state.storage = ""
                     case " ", "\t":
                         state.storage += " "
                     case "\n":
@@ -498,8 +527,27 @@ class Instrumentor {
             var formatted = ""
             for token in tokens {
                 switch token.type {
-                case .token, .string:
+                case .token:
                     formatted += token.value
+                case .string:
+                    formatted += "\"" + token.value + "\""
+                case .indent(_):
+                    break
+                case .newline:
+                    formatted += " "
+                }
+            }
+            return formatted
+        }
+
+        func escaped(tokens: [Token]) -> String {
+            var formatted = ""
+            for token in tokens {
+                switch token.type {
+                case .token:
+                    formatted += token.value
+                case .string:
+                    formatted += "\\\"" + token.value.replacingOccurrences(of: "\"", with: "\\\\\"") + "\\\""
                 case .indent(_):
                     break
                 case .newline:
