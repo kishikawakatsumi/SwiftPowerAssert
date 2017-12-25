@@ -17,17 +17,20 @@
 ////////////////////////////////////////////////////////////////////////////
 
 import XCTest
+import Basic
 import SwiftPowerAssertCore
 
 struct TestRunner {
     func run(source: String, options: Options = Options(), identifier: String = #function) throws -> String {
-        let temporaryDirectory = NSTemporaryDirectory()
-        let sourceFilePath = (temporaryDirectory as NSString).appendingPathComponent("com.kishikawakatsumi.swift-power-assert-tests-\(identifier)-\(UUID().uuidString).swift")
-        let executablePath = (sourceFilePath as NSString).deletingPathExtension + ".o"
+        let temporaryDirectory = try TemporaryDirectory(prefix: "com.kishikawakatsumi.swift-power-assert", removeTreeOnDeinit: true)
+        let temporaryFile = try TemporaryFile(dir: temporaryDirectory.path, prefix: "test", suffix: ".swift")
+
+        let sourceFilePath = temporaryFile.path.asString
+        let executablePath = sourceFilePath + ".o"
 
         try source.write(toFile: sourceFilePath, atomically: true, encoding: .utf8)
 
-        let runner = SwiftPowerAssert(sources: sourceFilePath, output: temporaryDirectory, options: options)
+        let runner = SwiftPowerAssert(sources: sourceFilePath, output: temporaryDirectory.path.asString, options: options)
         try runner.run()
 
         let sdk = options.sdk
