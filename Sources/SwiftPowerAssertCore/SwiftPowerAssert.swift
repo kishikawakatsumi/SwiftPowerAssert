@@ -17,6 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 import Foundation
+import Basic
 
 public final class SwiftPowerAssert {
     private let sources: String
