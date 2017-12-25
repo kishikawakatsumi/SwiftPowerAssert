@@ -20,15 +20,19 @@ import XCTest
 import SwiftPowerAssertCore
 
 struct TestRunner {
-    func run(source: String, identifier: String = #function) throws -> String {
+    func run(source: String, options: Options = Options(), identifier: String = #function) throws -> String {
         let temporaryDirectory = NSTemporaryDirectory()
         let sourceFilePath = (temporaryDirectory as NSString).appendingPathComponent("com.kishikawakatsumi.swift-power-assert-tests-\(identifier)-\(UUID().uuidString).swift")
-        let executablePath = (sourceFilePath as NSString).deletingPathExtension + "o"
+        let executablePath = (sourceFilePath as NSString).deletingPathExtension + ".o"
 
         try source.write(toFile: sourceFilePath, atomically: true, encoding: .utf8)
 
-        let runner = SwiftPowerAssert(sources: sourceFilePath, output: temporaryDirectory, testable: true)
+        let runner = SwiftPowerAssert(sources: sourceFilePath, output: temporaryDirectory, options: options)
         try runner.run()
+
+        let sdk = options.sdk
+        let sdkPath = sdk.path
+        let target = "\(options.arch)-apple-\(options.sdk)\(options.deploymentTarget)"
 
         let compile = Process()
         compile.launchPath = "/usr/bin/xcrun"
@@ -36,14 +40,19 @@ struct TestRunner {
             "swiftc",
             "-O",
             "-whole-module-optimization",
-            "-F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+            sourceFilePath,
+            "-o",
+            executablePath,
+            "-target",
+            target,
+            "-sdk",
+            sdkPath,
+            "-F",
+            "\(sdkPath)/../../../Developer/Library/Frameworks",
             "-Xlinker",
             "-rpath",
             "-Xlinker",
-            "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
-            sourceFilePath,
-            "-o",
-            executablePath
+            "\(sdkPath)/../../../Developer/Library/Frameworks",
         ]
         compile.launch()
         compile.waitUntilExit()
