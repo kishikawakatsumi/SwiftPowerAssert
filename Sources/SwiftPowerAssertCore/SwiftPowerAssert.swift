@@ -75,9 +75,22 @@ public final class SwiftPowerAssert {
         compile.launch()
 
         let result = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)!
+        var lines = [String]()
+        result.enumerateLines { (line, stop) in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("(normal_conformance") ||
+                trimmed.hasPrefix("(abstract_conformance") ||
+                trimmed.hasPrefix("(specialized_conformance") ||
+                trimmed.hasPrefix("(assoc_type") ||
+                trimmed.hasPrefix("(value req") ||
+                !trimmed.hasPrefix("(") {
+                return
+            }
+            lines.append(line)
+        }
 
         let tokenizer = Tokenizer()
-        let tokens = tokenizer.tokenize(source: result)
+        let tokens = tokenizer.tokenize(source: lines.joined(separator: "\n"))
 
         let lexer = Lexer()
         let node = lexer.lex(tokens: tokens)

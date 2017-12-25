@@ -656,4 +656,65 @@ class SwiftPowerAssertTests: XCTestCase {
         let result = try TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
+
+    func testTryExpression() throws {
+        let source = """
+            import XCTest
+
+            struct Coordinate: Codable {
+                var latitude: Double
+                var longitude: Double
+            }
+
+            struct Landmark: Codable {
+                var name: String
+                var foundingYear: Int
+                var location: Coordinate
+            }
+
+            class Tests: XCTestCase {
+                @objc dynamic func testMethod() {
+                    let landmark = Landmark(name: \"Tokyo Tower\",
+                                            foundingYear: 1957,
+                                            location: Coordinate(latitude: 35.658581, longitude: 139.745438))
+                    assert(try! JSONEncoder().encode(landmark) ==
+                        "{ name: \\"Tokyo Tower\\" }".data(using: String.Encoding.utf8))
+                    assert(try! JSONEncoder().encode(landmark) ==
+                        "{ name: \\"Tokyo Tower\\" }".data(using: .utf8))
+                    assert(try! "{ name: \\"Tokyo Tower\\" }".data(using: String.Encoding.utf8) ==
+                        JSONEncoder().encode(landmark))
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert(try! JSONEncoder().encode(landmark) == "{ name: \\"Tokyo Tower\\" }".data(using: String.Encoding.utf8))
+                        |             |      |         |  |                           |                           |
+                        |             |      |         |  { name: "Tokyo Tower" }     23 bytes                    Unicode (UTF-8)
+                        |             |      |         false
+                        |             |      Landmark(name: "Tokyo Tower", foundingYear: 1957, location: main.Coordinate(latitude: 35.658580999999998, longitude: 139.74543800000001))
+                        |             99 bytes
+                        Foundation.JSONEncoder
+            assert(try! JSONEncoder().encode(landmark) == "{ name: \\"Tokyo Tower\\" }".data(using: .utf8))
+                        |             |      |         |  |                           |            |
+                        |             |      |         |  { name: "Tokyo Tower" }     23 bytes     Unicode (UTF-8)
+                        |             |      |         false
+                        |             |      Landmark(name: "Tokyo Tower", foundingYear: 1957, location: main.Coordinate(latitude: 35.658580999999998, longitude: 139.74543800000001))
+                        |             99 bytes
+                        Foundation.JSONEncoder
+            assert(try! "{ name: \\"Tokyo Tower\\" }".data(using: String.Encoding.utf8) == JSONEncoder().encode(landmark))
+                        |                           |                           |     |  |             |      |
+                        { name: "Tokyo Tower" }     23 bytes                    |     |  |             |      Landmark(name: "Tokyo Tower", foundingYear: 1957, location: main.Coordinate(latitude: 35.658580999999998, longitude: 139.74543800000001))
+                                                                                |     |  |             99 bytes
+                                                                                |     |  Foundation.JSONEncoder
+                                                                                |     false
+                                                                                Unicode (UTF-8)
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
 }
