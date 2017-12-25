@@ -37,9 +37,8 @@ struct TestRunner {
         let sdkPath = sdk.path
         let target = "\(options.arch)-apple-\(options.sdk)\(options.deploymentTarget)"
 
-        let compile = Process()
-        compile.launchPath = "/usr/bin/xcrun"
-        compile.arguments = [
+        let arguments = [
+            "/usr/bin/xcrun",
             "swiftc",
             "-O",
             "-whole-module-optimization",
@@ -57,16 +56,29 @@ struct TestRunner {
             "-Xlinker",
             "\(sdkPath)/../../../Developer/Library/Frameworks",
         ]
-        compile.launch()
-        compile.waitUntilExit()
 
-        let exec = Process()
-        exec.launchPath = executablePath
-        let pipe = Pipe()
-        exec.standardOutput = pipe
-        exec.launch()
+        let compile = Process(arguments: arguments)
+        try compile.launch()
+        let compileResult = try compile.waitUntilExit()
+        switch compileResult.exitStatus {
+        case .terminated(_):
+            break
+        case .signalled(_):
+            break
+        }
 
-        let result = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)!
+        let exec = Process(arguments: [executablePath])
+        try exec.launch()
+
+        let execResult = try exec.waitUntilExit()
+        switch execResult.exitStatus {
+        case .terminated(_):
+            break
+        case .signalled(_):
+            break
+        }
+
+        let result = try execResult.utf8Output()
         print(result)
 
         return result
