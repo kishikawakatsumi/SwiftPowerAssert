@@ -732,4 +732,31 @@ class SwiftPowerAssertTests: XCTestCase {
         let result = try TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
+
+    func testNilLiteral() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let string = \"1234\"
+                    let number = Int(string)
+                    assert(number != nil && number == 1111)
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert(number != nil && number == 1111)
+                   |      |  |   |  |      |  |
+                   1234   |  nil |  1234   |  1111
+                          true   false     false
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
 }

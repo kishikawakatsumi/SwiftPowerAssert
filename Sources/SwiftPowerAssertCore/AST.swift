@@ -37,6 +37,8 @@ struct Expression {
     let source: String
     let decl: String?
     let value: String?
+    let throwsModifier: String?
+    let argumentLabels: String?
     let isImplicit: Bool
     var expressions = [Expression]()
 }
