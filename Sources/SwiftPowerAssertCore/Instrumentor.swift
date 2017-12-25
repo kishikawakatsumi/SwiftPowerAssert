@@ -158,9 +158,10 @@ class Instrumentor {
 
                 let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
 
-                // FIXME
-                if !childExpression.expressions.isEmpty && childExpression.expressions[0].type.contains("throws") {
+                if !childExpression.expressions.isEmpty && childExpression.throwsModifier == "throws" {
                     values[column] = "try! " + formatter.format(tokens: formatter.tokenize(source: source))
+                } else if childExpression.argumentLabels == "nilLiteral:" {
+                    values[column] = formatter.format(tokens: formatter.tokenize(source: source)) + " as \(childExpression.type)"
                 } else {
                     values[column] = formatter.format(tokens: formatter.tokenize(source: source))
                 }
@@ -174,10 +175,9 @@ class Instrumentor {
                 var containsThrowsFunction = false
                 traverse(childExpression) {
                     guard !containsThrowsFunction else { return }
-                    containsThrowsFunction = $0.type.contains("throws") // FIXME: It should check 'throws' or 'nothrow' in 'call_expr'
+                    containsThrowsFunction = $0.rawValue == "call_expr" && $0.throwsModifier == "throws"
                 }
 
-                // FIXME
                 let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
                 values[column] = (containsThrowsFunction ? "try! " : "") + formatter.format(tokens: formatter.tokenize(source: source))
             }

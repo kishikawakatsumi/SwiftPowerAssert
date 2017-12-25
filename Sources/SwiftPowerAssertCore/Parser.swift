@@ -339,7 +339,21 @@ class Parser {
         let location = parseLocation(rawLocation)
         let rawRange = attributes["range"]!
         let source = parseRange(rawRange)
-        var expression = Expression(rawValue: tokens[1].value, type: attributes["type"]!, rawLocation: rawLocation, rawRange: rawRange, location: location, range: source.1, source: source.0, decl: attributes["decl"], value: attributes["value"], isImplicit: isImplicit(tokens: tokens), expressions: [])
+        let argumentLabels = attributes["arg_labels"]
+        var throwsModifier: String?
+        for token in tokens {
+            switch token.type {
+            case .token where token.value == "nothrow":
+                throwsModifier = "nothrow"
+            case .token where token.value == "throws":
+                throwsModifier = "throws"
+            case .token where token.value == "rethrows":
+                throwsModifier = "rethrows"
+            default:
+                break
+            }
+        }
+        var expression = Expression(rawValue: tokens[1].value, type: attributes["type"]!, rawLocation: rawLocation, rawRange: rawRange, location: location, range: source.1, source: source.0, decl: attributes["decl"], value: attributes["value"], throwsModifier: throwsModifier, argumentLabels: argumentLabels, isImplicit: isImplicit(tokens: tokens), expressions: [])
 
         for node in node.children {
             for token in node.value {
