@@ -3,6 +3,7 @@
 Power Assert in Swift. Provides descriptive assertion messages through standard assert interface. No API is the best API.
 
 [![Build Status](https://www.bitrise.io/app/05d5545de36d77a7/status.svg?token=2KUMgdXPKlzEiMPBRZzugg&branch=master)](https://www.bitrise.io/app/05d5545de36d77a7)
+[![codecov](https://codecov.io/gh/kishikawakatsumi/SwiftPowerAssert/branch/master/graph/badge.svg)](https://codecov.io/gh/kishikawakatsumi/SwiftPowerAssert)
 
 Description
 ---------------------------------------
