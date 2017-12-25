@@ -57,11 +57,8 @@ public final class SwiftPowerAssert {
         let sdkPath = sdk.path
         let target = "\(options.arch)-apple-\(options.sdk)\(options.deploymentTarget)"
 
-        let compile = Process()
-        let pipe = Pipe()
-        compile.standardError = pipe
-        compile.launchPath = "/usr/bin/xcrun"
-        compile.arguments = [
+        let arguments = [
+            "/usr/bin/xcrun",
             "swiftc",
             fileURL.path,
             "-target",
@@ -73,9 +70,18 @@ public final class SwiftPowerAssert {
             "-Onone",
             "-dump-ast"
         ]
-        compile.launch()
 
-        let result = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)!
+        let compile = Process(arguments: arguments)
+        try compile.launch()
+        let compileResult = try compile.waitUntilExit()
+        switch compileResult.exitStatus {
+        case .terminated(_):
+            break
+        case .signalled(_):
+            break
+        }
+
+        let result = try compileResult.utf8stderrOutput()
         var lines = [String]()
         result.enumerateLines { (line, stop) in
             let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -146,18 +152,10 @@ public enum SDK: String {
     case watchsimulator
 
     public var path: String {
-        let shell = Process()
-        shell.launchPath = "/usr/bin/xcrun"
-        shell.arguments = [
-            "--sdk",
-            "\(self)",
-            "--show-sdk-path"
-        ]
-        let pipe = Pipe()
-        shell.standardOutput = pipe
-        shell.launch()
-
-        return String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)!.trimmingCharacters(in: .whitespacesAndNewlines)
+        let shell = Process(arguments: ["/usr/bin/xcrun", "--sdk", "\(self)", "--show-sdk-path"])
+        try! shell.launch()
+        let result = try! shell.waitUntilExit().utf8Output()
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 
