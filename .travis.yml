@@ -3,6 +3,11 @@ osx_image: xcode9.2
 script:
 - swift test
 - swift test -c release
+- swift package generate-xcodeproj
+- xcodebuild test -scheme SwiftPowerAssert-Package -sdk macosx -destination 'platform=OS X,arch=x86_64'
+  -enableCodeCoverage YES
+after_success:
+- bash <(curl -s https://codecov.io/bash)
 env:
   global:
   - LANG=en_US.UTF-8
