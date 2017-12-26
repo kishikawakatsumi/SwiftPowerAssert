@@ -1256,4 +1256,75 @@ class SwiftPowerAssertTests: XCTestCase {
         let result = try TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
+
+    func testOptionalChainingExpression() throws {
+        let source = """
+            import XCTest
+
+                class SomeClass {
+                    var property = OtherClass()
+                    init() {}
+                }
+
+                class OtherClass {
+                    func performAction() -> Bool {
+                        return false
+                    }
+                }
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    var c: SomeClass?
+                    assert(c?.property.performAction() != nil)
+
+                    c = SomeClass()
+                    assert((c?.property.performAction())!)
+                    assert(c?.property.performAction() == nil)
+
+                    var someDictionary = ["a": [1, 2, 3], "b": [10, 20]]
+                    assert(someDictionary["not here"]?[0] == 99)
+                    assert(someDictionary["a"]?[0] == 99)
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert(c?.property.performAction() != nil)
+                   |  |        |               |  |
+                   |  nil      nil             |  nil
+                   nil                         false
+            assert((c?.property.performAction())!)
+                    |  |        |
+                    |  |        false
+                    |  main.OtherClass
+                    main.SomeClass
+            assert(c?.property.performAction() == nil)
+                   |  |        |               |  |
+                   |  |        false           |  nil
+                   |  main.OtherClass          false
+                   main.SomeClass
+            assert(someDictionary["not here"]?[0] == 99)
+                   |              |         |  || |  |
+                   |              |         |  || |  99
+                   |              |         |  || false
+                   |              |         |  |nil
+                   |              |         |  0
+                   |              |         nil
+                   |              "not here"
+                   ["b": [10, 20], "a": [1, 2, 3]]
+            assert(someDictionary["a"]?[0] == 99)
+                   |              |  |  || |  |
+                   |              |  |  |1 |  99
+                   |              |  |  0  false
+                   |              |  [1, 2, 3]
+                   |              "a"
+                   ["b": [10, 20], "a": [1, 2, 3]]
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
 }
