@@ -1220,4 +1220,40 @@ class SwiftPowerAssertTests: XCTestCase {
         let result = try TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
+
+    func testForcedValueExpression() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let x: Int? = 0
+                    let someDictionary = ["a": [1, 2, 3], "b": [10, 20]]
+
+                    assert(x! == 1)
+                    assert(someDictionary["a"]![0] == 100)
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert(x! == 1)
+                   |  |  |
+                   0  |  1
+                      false
+            assert(someDictionary["a"]![0] == 100)
+                   |              |  |  || |  |
+                   |              |  |  |1 |  100
+                   |              |  |  0  false
+                   |              |  [1, 2, 3]
+                   |              "a"
+                   ["b": [10, 20], "a": [1, 2, 3]]
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
 }
