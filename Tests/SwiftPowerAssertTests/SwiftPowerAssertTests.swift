@@ -933,4 +933,41 @@ class SwiftPowerAssertTests: XCTestCase {
         let result = try TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
+
+    func testImplicitMemberExpression() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let i = 16
+                    assert(i == .bitWidth && i == Double.Exponent.bitWidth)
+
+                    let mask: CAAutoresizingMask = [.layerMaxXMargin, .layerMaxYMargin]
+                    assert(mask != [.layerMaxXMargin, .layerMaxYMargin])
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert(i == .bitWidth && i == Double.Exponent.bitWidth)
+                   | |   |        |  | |                  |
+                   | |   64       |  | false              64
+                   | false        |  16
+                   16             false
+            assert(mask != [.layerMaxXMargin, .layerMaxYMargin])
+                   |    |  | |                 |
+                   |    |  | |                 CAAutoresizingMask(rawValue: 32)
+                   |    |  | CAAutoresizingMask(rawValue: 4)
+                   |    |  CAAutoresizingMask(rawValue: 36)
+                   |    false
+                   CAAutoresizingMask(rawValue: 36)
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
 }

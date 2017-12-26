@@ -158,7 +158,7 @@ class Instrumentor {
                 let tokens = formatter.tokenize(source: expression.source)
 
                 let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
-                values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+                values[column] = formatter.format(tokens: formatter.tokenize(source: source)) + " as \(childExpression.type)"
             }
             if childExpression.rawValue == "subscript_expr" {
                 let source = childExpression.source
