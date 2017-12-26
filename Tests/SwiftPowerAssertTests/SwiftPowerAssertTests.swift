@@ -1163,4 +1163,36 @@ class SwiftPowerAssertTests: XCTestCase {
         let result = try TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
+
+    func testInitializerExpression() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let initializer: (Int) -> String = String.init
+                    assert([1, 2, 3].map(initializer).reduce("", +) != "123")
+                    assert([1, 2, 3].map(String.init).reduce("", +) != "123")
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert([1, 2, 3].map(initializer).reduce("", +) != "123")
+                   ||  |  |  |                |      |      |  |
+                   |1  2  3  ["1", "2", "3"]  "123"  ""     |  "123"
+                   [1, 2, 3]                                false
+            assert([1, 2, 3].map(String.init).reduce("", +) != "123")
+                   ||  |  |  |                |      |      |  |
+                   |1  2  3  ["1", "2", "3"]  "123"  ""     |  "123"
+                   [1, 2, 3]                                false
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
 }
+
