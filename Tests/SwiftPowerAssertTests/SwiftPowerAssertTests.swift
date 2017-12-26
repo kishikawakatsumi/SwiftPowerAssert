@@ -855,6 +855,8 @@ class SwiftPowerAssertTests: XCTestCase {
             class Tests: XCTestCase {
                 func testMethod() {
                     assert(#file == \"*.swift\" && #line == 1 && #column == 2 && #function == \"function\")
+                    assert(#colorLiteral(red: 0.8078431487, green: 0.02745098062, blue: 0.3333333433, alpha: 1) == .blue &&
+                           .blue == #colorLiteral(red: 0.8078431487, green: 0.02745098062, blue: 0.3333333433, alpha: 1))
                 }
             }
 
@@ -870,6 +872,15 @@ class SwiftPowerAssertTests: XCTestCase {
                    |                                           |    false
                    |                                           false
                    "/var/folders/pk/pqq01lrx7qz335ft5_1xb7m40000gn/T/com.kishikawakatsumi.swift-power-assert.ookfmK/test.YH6QSJ.swift"
+            assert(#colorLiteral(red: 0.8078431487, green: 0.02745098062, blue: 0.3333333433, alpha: 1) == .blue && .blue == #colorLiteral(red: 0.8078431487, green: 0.02745098062, blue: 0.3333333433, alpha: 1))
+                   |                  |                    |                    |                    |  |   |    |   |    |  |                  |                    |                    |                    |
+                   |                  0                    0                    0                    1  |   |    |   |    |  |                  0                    0                    0                    1
+                   NSCustomColorSpace sRGB IEC61966-2.1 colorspace 0.807843 0.027451 0.333333 1         |   |    |   |    |  NSCustomColorSpace sRGB IEC61966-2.1 colorspace 0.807843 0.027451 0.333333 1
+                                                                                                        |   |    |   |    false
+                                                                                                        |   |    |   NSCalibratedRGBColorSpace 0 0 1 1
+                                                                                                        |   |    false
+                                                                                                        |   NSCalibratedRGBColorSpace 0 0 1 1
+                                                                                                        false
 
             """
 

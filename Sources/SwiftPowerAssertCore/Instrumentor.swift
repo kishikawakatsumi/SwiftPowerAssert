@@ -150,7 +150,8 @@ class Instrumentor {
                 let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
                 values[column] = formatter.format(tokens: formatter.tokenize(source: source))
             }
-            if childExpression.rawValue == "array_expr" || childExpression.rawValue == "dictionary_expr" {
+            if childExpression.rawValue == "array_expr" || childExpression.rawValue == "dictionary_expr" ||
+                childExpression.rawValue == "object_literal" {
                 let source = childExpression.source
 
                 let formatter = Formatter()

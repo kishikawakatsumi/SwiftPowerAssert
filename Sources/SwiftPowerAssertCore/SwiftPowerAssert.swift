@@ -82,6 +82,7 @@ public final class SwiftPowerAssert {
         }
 
         let result = try compileResult.utf8stderrOutput()
+        print(result)
         var lines = [String]()
         result.enumerateLines { (line, stop) in
             let trimmed = line.trimmingCharacters(in: .whitespaces)
