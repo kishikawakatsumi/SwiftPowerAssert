@@ -118,7 +118,7 @@ class Instrumentor {
                 let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
                 values[column] = formatter.format(tokens: formatter.tokenize(source: source))
             }
-            if childExpression.rawValue == "member_ref_expr" {
+            if childExpression.rawValue == "member_ref_expr" ||  childExpression.rawValue == "dot_self_expr" {
                 let source = completeExpressionSource(childExpression, expression)
 
                 let formatter = Formatter()

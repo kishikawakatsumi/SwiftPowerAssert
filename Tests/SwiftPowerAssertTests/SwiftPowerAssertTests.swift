@@ -1194,5 +1194,30 @@ class SwiftPowerAssertTests: XCTestCase {
         let result = try TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
-}
 
+    func testPostfixSelfExpression() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    assert(String.self == Int.self && "string".self == "string")
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert(String.self == Int.self && "string".self == "string")
+                          |    |      |    |  |        |    |  |
+                          |    false  Int  |  "string" |    |  "string"
+                          String           false       |    true
+                                                       "string"
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+}
