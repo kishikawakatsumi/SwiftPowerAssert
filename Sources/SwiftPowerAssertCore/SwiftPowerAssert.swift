@@ -19,10 +19,6 @@
 import Foundation
 import Basic
 
-public enum SwiftPowerAsserrError: Error {
-    case buildFailed(String)
-}
-
 public final class SwiftPowerAssert {
     private let buildOptions: BuildOptions
 
@@ -41,10 +37,13 @@ public final class SwiftPowerAssert {
         let node = lex(tokens: tokens)
         let root = parse(node: node)
 
-        let sourceText = try String(contentsOf: sourceFile)
-        let transformed = instrument(source: sourceText, root: root, verbose: verbose)
-
-        return transformed
+        do {
+            let sourceText = try String(contentsOf: sourceFile)
+            let transformed = instrument(source: sourceText, root: root, verbose: verbose)
+            return transformed
+        } catch {
+            throw SwiftPowerAssertError.internalError("failed to read source file from: \(sourceFile)", error)
+        }
     }
 
     private func buildArguments(source: URL) -> [String] {
@@ -67,13 +66,15 @@ public final class SwiftPowerAssert {
 
     private func dumpAST(arguments: [String]) throws -> String {
         let process = Process(arguments: arguments)
-        try process.launch()
-        let result = try process.waitUntilExit()
-        let output = try result.utf8stderrOutput()
-        if case .terminated(let code) = result.exitStatus, code != 0 {
-            throw SwiftPowerAsserrError.buildFailed(output)
+        try! process.launch()
+        let result = try! process.waitUntilExit()
+        let output = try! result.utf8stderrOutput()
+        switch result.exitStatus {
+        case .terminated(let code) where code == 0:
+            return output
+        default:
+            throw SwiftPowerAssertError.buildFailed(output)
         }
-        return output
     }
 
     private func tokenize(rawAST: String) -> [Token] {

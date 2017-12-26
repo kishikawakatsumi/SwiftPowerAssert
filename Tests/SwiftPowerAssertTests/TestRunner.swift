@@ -41,8 +41,8 @@ class TestRunner {
     }()
     private lazy var options: BuildOptions = {
         let sdk = SDK.macosx
-        let sdkPath = sdk.path()
-        let sdkVersion = sdk.version()
+        let sdkPath = try! sdk.path()
+        let sdkVersion = try! sdk.version()
         return BuildOptions(sdkName: sdk.name + sdkVersion, sdkRoot: sdkPath,
                             platformName: sdk.name, platformTargetPrefix: sdk.os,
                             arch: "x86_64", deploymentTarget: sdkVersion,
@@ -65,8 +65,10 @@ class TestRunner {
         do {
             let transformed = try processor.processFile(input: URL(fileURLWithPath: sourceFilePath))
             try! transformed.write(toFile: sourceFilePath, atomically: true, encoding: .utf8)
+        } catch SwiftPowerAssertError.buildFailed(let description) {
+            fatalError(description)
         } catch {
-            fatalError("failed to instrument assertions")
+            fatalError(error.localizedDescription)
         }
 
         try! __DisplayWidth.myself.write(toFile: utilitiesFilePath, atomically: true, encoding: .utf8)
@@ -104,8 +106,7 @@ class TestRunner {
         try! process.launch()
         let result = try! process.waitUntilExit()
         if case .terminated(let code) = result.exitStatus, code != 0 {
-            print(try! result.utf8stderrOutput())
-            fatalError("failed to compile an instrumented file")
+            fatalError(try! result.utf8stderrOutput())
         }
     }
 
@@ -115,8 +116,7 @@ class TestRunner {
 
         let result = try! process.waitUntilExit()
         if case .terminated(let code) = result.exitStatus, code != 0 {
-            print(try! result.utf8stderrOutput())
-            fatalError("failed to run an instrumented code")
+            fatalError(try! result.utf8stderrOutput())
         }
 
         return try! result.utf8Output()

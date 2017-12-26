@@ -1,13 +1,24 @@
 language: objective-c
-osx_image: xcode9.2
 script:
-- swift test
-- swift test -c release
 - swift package generate-xcodeproj
-- xcodebuild test -scheme SwiftPowerAssert-Package -sdk macosx -destination 'platform=OS X,arch=x86_64'
-  -enableCodeCoverage YES
+- xcodebuild test -scheme SwiftPowerAssert-Package -sdk macosx -configuration $CONFIGURATION
+  -destination 'platform=OS X,arch=x86_64' -enableCodeCoverage YES
 after_success:
 - bash <(curl -s https://codecov.io/bash)
+matrix:
+  include:
+  - osx_image: xcode9.2
+    env: CONFIGURATION=Debug
+  - osx_image: xcode9.2
+    env: CONFIGURATION=Release
+  - osx_image: xcode9.1
+    env: CONFIGURATION=Debug
+  - osx_image: xcode9.1
+    env: CONFIGURATION=Release
+  - osx_image: xcode9
+    env: CONFIGURATION=Debug
+  - osx_image: xcode9
+    env: CONFIGURATION=Release
 env:
   global:
   - LANG=en_US.UTF-8
