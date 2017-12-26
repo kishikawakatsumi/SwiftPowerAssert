@@ -205,7 +205,7 @@ class SwiftPowerAssertTests: XCTestCase {
                     let three = 3
 
                     let array = [one, two, three]
-                    assert(array.description.hasPrefix(\"[\") == false && array.description.hasPrefix(\"Hello\") == true)
+                    assert(array.description.hasPrefix("[") == false && array.description.hasPrefix("Hello") == true)
                 }
             }
 
@@ -512,11 +512,11 @@ class SwiftPowerAssertTests: XCTestCase {
                     let array = [one, two, three]
                     assert(array
                         .description
-                        .hasPrefix(    \"[\"
+                        .hasPrefix(    "["
                         )
                         == false && array
                             .description
-                            .hasPrefix    (\"Hello\"    ) ==
+                            .hasPrefix    ("Hello"    ) ==
                         true)
                 }
             }
@@ -689,7 +689,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             class Tests: XCTestCase {
                 @objc dynamic func testMethod() {
-                    let landmark = Landmark(name: \"Tokyo Tower\",
+                    let landmark = Landmark(name: "Tokyo Tower",
                                             foundingYear: 1957,
                                             location: Coordinate(latitude: 35.658581, longitude: 139.745438))
                     assert(try! JSONEncoder().encode(landmark) ==
@@ -739,7 +739,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             class Tests: XCTestCase {
                 func testMethod() {
-                    let string = \"1234\"
+                    let string = "1234"
                     let number = Int(string)
                     assert(number != nil && number == 1111)
                 }
@@ -766,10 +766,10 @@ class SwiftPowerAssertTests: XCTestCase {
 
             class Tests: XCTestCase {
                 func testMethod() {
-                    let string = \"1234\"
+                    let string = "1234"
                     let number = Int(string)
-                    let hello = \"hello\"
-                    assert((number != nil ? string : \"hello\") == hello)
+                    let hello = "hello"
+                    assert((number != nil ? string : "hello") == hello)
                 }
             }
 
@@ -854,7 +854,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             class Tests: XCTestCase {
                 func testMethod() {
-                    assert(#file == \"*.swift\" && #line == 1 && #column == 2 && #function == \"function\")
+                    assert(#file == "*.swift" && #line == 1 && #column == 2 && #function == "function")
                     assert(#colorLiteral(red: 0.8078431487, green: 0.02745098062, blue: 0.3333333433, alpha: 1) == .blue &&
                            .blue == #colorLiteral(red: 0.8078431487, green: 0.02745098062, blue: 0.3333333433, alpha: 1))
                 }
@@ -908,7 +908,7 @@ class SwiftPowerAssertTests: XCTestCase {
                 let doubleValue = 999.9
 
                 func testMethod() {
-                    assert(self.stringValue == \"string\" && self.intValue == 100 && self.doubleValue == 0.1)
+                    assert(self.stringValue == "string" && self.intValue == 100 && self.doubleValue == 0.1)
                     assert(super.continueAfterFailure == false)
                 }
             }
