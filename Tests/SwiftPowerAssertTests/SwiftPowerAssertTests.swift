@@ -787,4 +787,34 @@ class SwiftPowerAssertTests: XCTestCase {
         let result = try TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
+
+    func testMagicLiteralExpression() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    assert(#file == \"*.swift\" && #line == 1 && #column == 2 && #function == \"function\")
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert(#file == "*.swift" && #line == 1 && #column == 2 && #function == "function")
+                   |     |  |         |  |     |  | |  |       |  | |  |         |  |
+                   |     |  "*.swift" |  19    |  1 |  32      |  2 |  |         |  "function"
+                   |     false        false    |    false      |    |  |         false
+                   |                           false           |    |  "testMethod()"
+                   |                                           |    false
+                   |                                           false
+                   "/var/folders/pk/pqq01lrx7qz335ft5_1xb7m40000gn/T/com.kishikawakatsumi.swift-power-assert.ookfmK/test.YH6QSJ.swift"
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected.replacingOccurrences(of: "/var/folders/pk/.+\\.swift", with: "", options: .regularExpression),
+                       result.replacingOccurrences(of: "/var/folders/pk/.+\\.swift", with: "", options: .regularExpression))
+    }
 }
