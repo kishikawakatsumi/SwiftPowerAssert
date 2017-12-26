@@ -788,7 +788,7 @@ class SwiftPowerAssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testArrayLiteralExpression3() throws {
+    func testArrayLiteralExpression() throws {
         let source = """
             import XCTest
 
@@ -818,7 +818,7 @@ class SwiftPowerAssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testDictionaryLiteralExpression3() throws {
+    func testDictionaryLiteralExpression() throws {
         let source = """
             import XCTest
 
@@ -887,5 +887,50 @@ class SwiftPowerAssertTests: XCTestCase {
         let result = try TestRunner().run(source: source)
         XCTAssertEqual(expected.replacingOccurrences(of: "/.+\\.swift", with: "", options: .regularExpression),
                        result.replacingOccurrences(of: "/.+\\.swift", with: "", options: .regularExpression))
+    }
+
+    func testSelfExpression() throws {
+        func toStr<T>(value: T?) -> String {
+            switch value {
+            case .some(let value):
+                return "\(value)"
+            case .none:
+                return "nil"
+            }
+        }
+
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                let stringValue = "string"
+                let intValue = 100
+                let doubleValue = 999.9
+
+                func testMethod() {
+                    assert(self.stringValue == \"string\" && self.intValue == 100 && self.doubleValue == 0.1)
+                    assert(super.continueAfterFailure == false)
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert(self.stringValue == "string" && self.intValue == 100 && self.doubleValue == 0.1)
+                   |    |           |  |        |  |    |        |  |   |  |    |           |  |
+                   |    "string"    |  "string" |  |    100      |  100 |  |    999.9       |  0
+                   -[Tests (null)]  true        |  |             true   |  -[Tests (null)]  false
+                                                |  -[Tests (null)]      false
+                                                true
+            assert(super.continueAfterFailure == false)
+                         |                    |  |
+                         true                 |  false
+                                              false
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
     }
 }
