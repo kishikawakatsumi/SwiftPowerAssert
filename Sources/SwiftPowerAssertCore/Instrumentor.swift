@@ -105,11 +105,12 @@ class Instrumentor {
         let formatter = Formatter()
         
         traverse(expression) { (childExpression) in
-            if childExpression.source == expression.source || (childExpression.range.start.line == expression.range.start.line && childExpression.range.start.column == expression.range.start.column) {
+            guard childExpression.source != expression.source && (childExpression.range.start.line != expression.range.start.line || childExpression.range.start.column != expression.range.start.column) else {
                 return
             }
 
-            if childExpression.rawValue == "declref_expr" && !childExpression.type.contains("->") {
+            if (childExpression.rawValue == "declref_expr" && !childExpression.type.contains("->")) ||
+                childExpression.rawValue == "magic_identifier_literal_expr" {
                 let source = completeExpressionSource(childExpression, expression)
                 
                 let formatter = Formatter()
@@ -132,7 +133,7 @@ class Instrumentor {
                     values[column] = formatter.format(tokens: formatter.tokenize(source: source))
                 }
             }
-            if childExpression.rawValue == "tuple_element_expr" {
+            if childExpression.rawValue == "tuple_element_expr" || childExpression.rawValue == "keypath_expr" {
                 let source = completeExpressionSource(childExpression, expression)
 
                 let formatter = Formatter()
@@ -150,15 +151,6 @@ class Instrumentor {
                 let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
                 values[column] = formatter.format(tokens: formatter.tokenize(source: source))
             }
-            if childExpression.rawValue == "magic_identifier_literal_expr" {
-                let source = completeExpressionSource(childExpression, expression)
-
-                let formatter = Formatter()
-                let tokens = formatter.tokenize(source: expression.source)
-
-                let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
-                values[column] = formatter.format(tokens: formatter.tokenize(source: source))
-            }
             if childExpression.rawValue == "array_expr" || childExpression.rawValue == "dictionary_expr" ||
                 childExpression.rawValue == "object_literal" {
                 let source = childExpression.source
@@ -167,15 +159,6 @@ class Instrumentor {
                 let tokens = formatter.tokenize(source: expression.source)
 
                 let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
-                values[column] = formatter.format(tokens: formatter.tokenize(source: source)) + " as \(childExpression.type)"
-            }
-            if childExpression.rawValue == "keypath_expr" {
-                let source = completeExpressionSource(childExpression, expression)
-
-                let formatter = Formatter()
-                let tokens = formatter.tokenize(source: expression.source)
-
-                let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
                 values[column] = formatter.format(tokens: formatter.tokenize(source: source)) + " as \(childExpression.type)"
             }
             if childExpression.rawValue == "subscript_expr" || childExpression.rawValue == "keypath_application_expr" {
