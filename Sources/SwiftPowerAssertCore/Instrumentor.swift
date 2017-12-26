@@ -132,6 +132,15 @@ class Instrumentor {
                     values[column] = formatter.format(tokens: formatter.tokenize(source: source))
                 }
             }
+            if childExpression.rawValue == "tuple_element_expr" {
+                let source = completeExpressionSource(childExpression, expression)
+
+                let formatter = Formatter()
+                let tokens = formatter.tokenize(source: expression.source)
+
+                let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
+                values[column] = formatter.format(tokens: formatter.tokenize(source: source)) + " as \(childExpression.type)"
+            }
             if childExpression.rawValue == "string_literal_expr" {
                 let source = stringLiteralExpression(childExpression, expression)
 

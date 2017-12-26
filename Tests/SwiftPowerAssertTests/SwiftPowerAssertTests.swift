@@ -970,4 +970,52 @@ class SwiftPowerAssertTests: XCTestCase {
         let result = try TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
+
+    func testTupleExpression() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let dc1 = DateComponents(calendar: Calendar(identifier: .gregorian), timeZone: TimeZone(abbreviation: "JST")!, year: 1980, month: 10, day: 28)
+                    let date1 = dc1.date!
+                    let dc2 = DateComponents(calendar: Calendar(identifier: .gregorian), timeZone: TimeZone(abbreviation: "JST")!, year: 2000, month: 12, day: 31)
+                    let date2 = dc2.date!
+
+                    let tuple = (name: "Katsumi", age: 37, birthday: date1)
+
+                    assert(tuple == (name: "Katsumi", age: 37, birthday: date2))
+                    assert(tuple == ("Katsumi", 37, date2))
+                    assert(tuple.name != ("Katsumi", 37, date2).0 || tuple.age != ("Katsumi", 37, date2).1)
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert(tuple == (name: "Katsumi", age: 37, birthday: date2))
+                   |     |         |               |             |
+                   |     false     "Katsumi"       37            2000-12-30 15:00:00 +0000
+                   (name: "Katsumi", age: 37, birthday: 1980-10-27 15:00:00 +0000)
+            assert(tuple == ("Katsumi", 37, date2))
+                   |     |   |          |   |
+                   |     |   "Katsumi"  37  2000-12-30 15:00:00 +0000
+                   |     false
+                   (name: "Katsumi", age: 37, birthday: 1980-10-27 15:00:00 +0000)
+            assert(tuple.name != ("Katsumi", 37, date2).0 || tuple.age != ("Katsumi", 37, date2).1)
+                   |     |    |   |          |   |      | |  |     |   |   |          |   |      |
+                   |     |    |   "Katsumi"  37  |      | |  |     37  |   "Katsumi"  37  |      37
+                   |     |    false              |      | |  |         false              2000-12-30 15:00:00 +0000
+                   |     "Katsumi"               |      | |  (name: "Katsumi", age: 37, birthday: 1980-10-27 15:00:00 +0000)
+                   |                             |      | false
+                   |                             |      "Katsumi"
+                   |                             2000-12-30 15:00:00 +0000
+                   (name: "Katsumi", age: 37, birthday: 1980-10-27 15:00:00 +0000)
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
 }
