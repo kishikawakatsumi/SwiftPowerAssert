@@ -181,6 +181,15 @@ class Instrumentor {
                 let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
                 values[column] = (containsThrowsFunction ? "try! " : "") + formatter.format(tokens: formatter.tokenize(source: source))
             }
+            if childExpression.rawValue == "if_expr" {
+                let source = ifExpression(childExpression, expression)
+
+                let formatter = Formatter()
+                let tokens = formatter.tokenize(source: expression.source)
+
+                let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
+                values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+            }
         }
 
         var recordValues = ""
@@ -194,6 +203,7 @@ class Instrumentor {
         do {
         func toString<T>(_ value: T?) -> String {
         switch value {
+        case .some(let v) where v is String: return \"\\"\\(v)\\\""
         case .some(let v): return \"\\(v)\"
         case .none: return \"nil\"
         }
@@ -242,59 +252,33 @@ class Instrumentor {
     }
 
     private func declarationReferenceExpression(_ child: Expression, _ parent: Expression) -> String {
-        var source = child.source
+        let source = child.source
         let rest = restOfExpression(child, parent)
-        for character in rest {
-            switch character {
-            case ".", ",", " ", "\t", "\n", "(", "[", "{", ")", "]", "}":
-                return source
-            default:
-                source += String(character)
-            }
-        }
-        return source
+        return extendExpression(rest, source)
     }
 
     private func memberReferenceExpression(_ child: Expression, _ parent: Expression) -> String {
-        var source = child.source
+        let source = child.source
         let rest = restOfExpression(child, parent)
-        for character in rest {
-            switch character {
-            case ".", ",", " ", "\t", "\n", "(", "[", "{", ")", "]", "}":
-                return source
-            default:
-                source += String(character)
-            }
-        }
-        return source
+        return extendExpression(rest, source)
     }
 
     private func binaryExpression(_ child: Expression, _ parent: Expression) -> String {
-        var source = child.source
+        let source = child.source
         let rest = restOfExpression(child, parent)
-        for character in rest {
-            switch character {
-            case ".", ",", " ", "\t", "\n", "(", "[", "{", ")", "]", "}":
-                return source
-            default:
-                source += String(character)
-            }
-        }
-        return source
+        return extendExpression(rest, source)
+    }
+
+    private func ifExpression(_ child: Expression, _ parent: Expression) -> String {
+        let source = child.source
+        let rest = restOfExpression(child, parent)
+        return extendExpression(rest, source)
     }
 
     private func callExpression(_ child: Expression, _ parent: Expression) -> String {
-        var source = child.source
+        let source = child.source
         let rest = restOfExpression(child, parent)
-        for character in rest {
-            switch character {
-            case ".", ",", " ", "\t", "\n", "(", "[", "{", ")", "]", "}":
-                return source
-            default:
-                source += String(character)
-            }
-        }
-        return source
+        return extendExpression(rest, source)
     }
 
     private func stringLiteralExpression(_ child: Expression, _ parent: Expression) -> String {
@@ -336,6 +320,19 @@ class Instrumentor {
         }
 
         return String(source[startIndex...endIndex])
+    }
+
+    private func extendExpression(_ rest: String, _ source: String) -> String {
+        var result = source
+        for character in rest {
+            switch character {
+            case ".", ",", " ", "\t", "\n", "(", "[", "{", ")", "]", "}":
+                return result
+            default:
+                result += String(character)
+            }
+        }
+        return result
     }
 
     private func columnInFunctionCall(column: Int, startLine: Int, endLine: Int, tokens: [Formatter.Token], child: Expression, parent: Expression) -> Int {
