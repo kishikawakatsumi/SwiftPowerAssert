@@ -169,7 +169,16 @@ class Instrumentor {
                 let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
                 values[column] = formatter.format(tokens: formatter.tokenize(source: source)) + " as \(childExpression.type)"
             }
-            if childExpression.rawValue == "subscript_expr" {
+            if childExpression.rawValue == "keypath_expr" {
+                let source = completeExpressionSource(childExpression, expression)
+
+                let formatter = Formatter()
+                let tokens = formatter.tokenize(source: expression.source)
+
+                let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
+                values[column] = formatter.format(tokens: formatter.tokenize(source: source)) + " as \(childExpression.type)"
+            }
+            if childExpression.rawValue == "subscript_expr" || childExpression.rawValue == "keypath_application_expr" {
                 let source = childExpression.source
 
                 let formatter = Formatter()
@@ -546,7 +555,7 @@ class Instrumentor {
             for token in tokens {
                 switch token.type {
                 case .token:
-                    formatted += token.value
+                    formatted += token.value.replacingOccurrences(of: "\\", with: "\\\\")
                 case .string:
                     formatted += "\\\"" + token.value.replacingOccurrences(of: "\"", with: "\\\\\"") + "\\\""
                 case .indent(_):

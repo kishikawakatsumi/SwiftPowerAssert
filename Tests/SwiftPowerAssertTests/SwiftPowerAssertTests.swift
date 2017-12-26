@@ -1018,4 +1018,97 @@ class SwiftPowerAssertTests: XCTestCase {
         let result = try TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
+
+    func testKeyPathExpression() throws {
+        let source = """
+            import XCTest
+
+            struct SomeStructure {
+                var someValue: Int
+
+                func getValue(keyPath: KeyPath<SomeStructure, Int>) -> Int {
+                    return self[keyPath: keyPath]
+                }
+            }
+
+            struct OuterStructure {
+                var outer: SomeStructure
+
+                init(someValue: Int) {
+                    self.outer = SomeStructure(someValue: someValue)
+                }
+
+                func getValue(keyPath: KeyPath<OuterStructure, Int>) -> Int {
+                    return self[keyPath: keyPath]
+                }
+            }
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let s = SomeStructure(someValue: 12)
+                    let pathToProperty = \\SomeStructure.someValue
+
+                    assert(s[keyPath: pathToProperty] == 13)
+                    assert(s[keyPath: \\SomeStructure.someValue] == 13)
+                    assert(s.getValue(keyPath: \\.someValue) == 13)
+
+                    let nested = OuterStructure(someValue: 24)
+                    let nestedKeyPath = \\OuterStructure.outer.someValue
+
+                    assert(nested[keyPath: nestedKeyPath] == 13)
+                    assert(nested[keyPath: \\OuterStructure.outer.someValue] == 13)
+                    assert(nested.getValue(keyPath: \\.outer.someValue) == 13)
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert(s[keyPath: pathToProperty] == 13)
+                   |          |             | |  |
+                   |          |             | |  13
+                   |          |             | false
+                   |          |             12
+                   |          Swift.WritableKeyPath<main.SomeStructure, Swift.Int>
+                   SomeStructure(someValue: 12)
+            assert(s[keyPath: \\SomeStructure.someValue] == 13)
+                   |                         |        | |  |
+                   |                         |        | |  13
+                   |                         |        | false
+                   |                         |        12
+                   |                         Swift.WritableKeyPath<main.SomeStructure, Swift.Int>
+                   SomeStructure(someValue: 12)
+            assert(s.getValue(keyPath: \\.someValue) == 13)
+                   | |                   |          |  |
+                   | 12                  |          |  13
+                   |                     |          false
+                   |                     Swift.WritableKeyPath<main.SomeStructure, Swift.Int>
+                   SomeStructure(someValue: 12)
+            assert(nested[keyPath: nestedKeyPath] == 13)
+                   |               |            | |  |
+                   |               |            | |  13
+                   |               |            | false
+                   |               |            24
+                   |               Swift.WritableKeyPath<main.OuterStructure, Swift.Int>
+                   OuterStructure(outer: main.SomeStructure(someValue: 24))
+            assert(nested[keyPath: \\OuterStructure.outer.someValue] == 13)
+                   |                                     |        | |  |
+                   |                                     |        | |  13
+                   |                                     |        | false
+                   |                                     |        24
+                   |                                     Swift.WritableKeyPath<main.OuterStructure, Swift.Int>
+                   OuterStructure(outer: main.SomeStructure(someValue: 24))
+            assert(nested.getValue(keyPath: \\.outer.someValue) == 13)
+                   |      |                         |          |  |
+                   |      24                        |          |  13
+                   |                                |          false
+                   |                                Swift.WritableKeyPath<main.OuterStructure, Swift.Int>
+                   OuterStructure(outer: main.SomeStructure(someValue: 24))
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
 }
