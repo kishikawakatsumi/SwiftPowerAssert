@@ -1058,6 +1058,19 @@ class SwiftPowerAssertTests: XCTestCase {
                     assert(nested[keyPath: nestedKeyPath] == 13)
                     assert(nested[keyPath: \\OuterStructure.outer.someValue] == 13)
                     assert(nested.getValue(keyPath: \\.outer.someValue) == 13)
+
+                    let greetings = ["hello", "hola", "bonjour", "안녕"]
+
+                    assert(greetings[keyPath: \\[String].[1]] == "hello")
+                    assert(greetings[keyPath: \\[String].first?.count] == 4)
+
+                    let interestingNumbers = ["prime": [2, 3, 5, 7, 11, 13, 15],
+                                              "triangular": [1, 3, 6, 10, 15, 21, 28],
+                                              "hexagonal": [1, 6, 15, 28, 45, 66, 91]]
+                    assert(interestingNumbers[keyPath: \\[String: [Int]].["prime"]]! == [1, 2, 3])
+                    assert(interestingNumbers[keyPath: \\[String: [Int]].["prime"]![0]] != 2)
+                    assert(interestingNumbers[keyPath: \\[String: [Int]].["hexagonal"]!.count] != 7)
+                    assert(interestingNumbers[keyPath: \\[String: [Int]].["hexagonal"]!.count.bitWidth] != 64)
                 }
             }
 
@@ -1105,6 +1118,45 @@ class SwiftPowerAssertTests: XCTestCase {
                    |                                |          false
                    |                                Swift.WritableKeyPath<main.OuterStructure, Swift.Int>
                    OuterStructure(outer: main.SomeStructure(someValue: 24))
+            assert(greetings[keyPath: \\[String].[1]] == "hello")
+                   |                              || |  |
+                   |                              || |  "hello"
+                   |                              || false
+                   |                              |"hola"
+                   |                              Swift.WritableKeyPath<Swift.Array<Swift.String>, Swift.String>
+                   ["hello", "hola", "bonjour", "안녕"]
+            assert(greetings[keyPath: \\[String].first?.count] == 4)
+                   |                                   |    | |  |
+                   ["hello", "hola", "bonjour", "안녕"]  |    5 |  4
+                                                       |      false
+                                                       Swift.KeyPath<Swift.Array<Swift.String>, Swift.Optional<Swift.Int>>
+            assert(interestingNumbers[keyPath: \\[String: [Int]].["prime"]]! == [1, 2, 3])
+                   |                                                    ||  |  ||  |  |
+                   |                                                    ||  |  |1  2  3
+                   |                                                    ||  |  [1, 2, 3]
+                   |                                                    ||  false
+                   |                                                    |[2, 3, 5, 7, 11, 13, 15]
+                   |                                                    Swift.WritableKeyPath<Swift.Dictionary<Swift.String, Swift.Array<Swift.Int>>, Swift.Optional<Swift.Array<Swift.Int>>>
+                   ["prime": [2, 3, 5, 7, 11, 13, 15], "triangular": [1, 3, 6, 10, 15, 21, 28], "hexagonal": [1, 6, 15, 28, 45, 66, 91]]
+            assert(interestingNumbers[keyPath: \\[String: [Int]].["prime"]![0]] != 2)
+                   |                                                        || |  |
+                   |                                                        |2 |  2
+                   |                                                        |  false
+                   |                                                        Swift.WritableKeyPath<Swift.Dictionary<Swift.String, Swift.Array<Swift.Int>>, Swift.Int>
+                   ["prime": [2, 3, 5, 7, 11, 13, 15], "triangular": [1, 3, 6, 10, 15, 21, 28], "hexagonal": [1, 6, 15, 28, 45, 66, 91]]
+            assert(interestingNumbers[keyPath: \\[String: [Int]].["hexagonal"]!.count] != 7)
+                   |                                                           |    | |  |
+                   |                                                           |    7 |  7
+                   |                                                           |      false
+                   |                                                           Swift.KeyPath<Swift.Dictionary<Swift.String, Swift.Array<Swift.Int>>, Swift.Int>
+                   ["prime": [2, 3, 5, 7, 11, 13, 15], "triangular": [1, 3, 6, 10, 15, 21, 28], "hexagonal": [1, 6, 15, 28, 45, 66, 91]]
+            assert(interestingNumbers[keyPath: \\[String: [Int]].["hexagonal"]!.count.bitWidth] != 64)
+                   |                                                                 |       | |  |
+                   |                                                                 |       | |  64
+                   |                                                                 |       | false
+                   |                                                                 |       64
+                   |                                                                 Swift.KeyPath<Swift.Dictionary<Swift.String, Swift.Array<Swift.Int>>, Swift.Int>
+                   ["prime": [2, 3, 5, 7, 11, 13, 15], "triangular": [1, 3, 6, 10, 15, 21, 28], "hexagonal": [1, 6, 15, 28, 45, 66, 91]]
 
             """
 
