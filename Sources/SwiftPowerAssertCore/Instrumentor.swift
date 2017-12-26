@@ -339,7 +339,7 @@ class Instrumentor {
         var result = source
         for character in rest {
             switch character {
-            case ".", ",", " ", "\t", "\n", "(", "[", "{", ")", "]", "}", ":", ";":
+            case ".", ",", " ", "\t", "\n", "(", "[", "{", ")", "]", "}", ":", ";", "?":
                 return result
             default:
                 result += String(character)
