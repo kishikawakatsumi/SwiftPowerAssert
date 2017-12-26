@@ -325,9 +325,9 @@ class SwiftPowerAssertTests: XCTestCase {
 
         let expected = """
             assert([one, two, three].count == 10)
-                    |    |    |      |     |  |
-                    1    2    3      3     |  10
-                                           false
+                   ||    |    |      |     |  |
+                   |1    2    3      3     |  10
+                   [1, 2, 3]               false
 
             """
 
@@ -662,9 +662,9 @@ class SwiftPowerAssertTests: XCTestCase {
 
         let expected = """
             assert([one, two , three] .count == 10)
-                    |    |     |       |     |  |
-                    1    2     3       3     |  10
-                                             false
+                   ||    |     |       |     |  |
+                   |1    2     3       3     |  10
+                   [1, 2, 3]                 false
 
             """
 
@@ -781,6 +781,66 @@ class SwiftPowerAssertTests: XCTestCase {
                     |      |  |   | |        |        |  |
                     1234   |  nil | "1234"   "hello"  |  "hello"
                            true   "1234"              false
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
+    func testArrayLiteralExpression3() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let zero = 0
+                    let one = 1
+                    let two = 2
+                    let three = 3
+
+                    assert([one, two, three].index(of: zero) == two)
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert([one, two, three].index(of: zero) == two)
+                   ||    |    |      |         |     |  |
+                   |1    2    3      nil       0     |  2
+                   [1, 2, 3]                         false
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
+    func testDictionaryLiteralExpression3() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let zero = 0
+                    let one = 1
+                    let two = 2
+                    let three = 3
+
+                    assert([zero: one, two: three].count == three)
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert([zero: one, two: three].count == three)
+                   ||     |    |    |      |     |  |
+                   |0     1    2    3      2     |  3
+                   [2: 3, 0: 1]                  false
 
             """
 

@@ -150,6 +150,15 @@ class Instrumentor {
                 let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
                 values[column] = formatter.format(tokens: formatter.tokenize(source: source))
             }
+            if childExpression.rawValue == "array_expr" || childExpression.rawValue == "dictionary_expr" {
+                let source = childExpression.source
+
+                let formatter = Formatter()
+                let tokens = formatter.tokenize(source: expression.source)
+
+                let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
+                values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+            }
             if childExpression.rawValue == "subscript_expr" {
                 let source = childExpression.source
 
@@ -311,7 +320,7 @@ class Instrumentor {
         var result = source
         for character in rest {
             switch character {
-            case ".", ",", " ", "\t", "\n", "(", "[", "{", ")", "]", "}":
+            case ".", ",", " ", "\t", "\n", "(", "[", "{", ")", "]", "}", ":", ";":
                 return result
             default:
                 result += String(character)
