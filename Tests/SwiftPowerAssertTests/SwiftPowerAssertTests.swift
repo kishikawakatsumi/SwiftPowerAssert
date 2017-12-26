@@ -874,7 +874,7 @@ class SwiftPowerAssertTests: XCTestCase {
             """
 
         let result = try TestRunner().run(source: source)
-        XCTAssertEqual(expected.replacingOccurrences(of: "/var/folders/pk/.+\\.swift", with: "", options: .regularExpression),
-                       result.replacingOccurrences(of: "/var/folders/pk/.+\\.swift", with: "", options: .regularExpression))
+        XCTAssertEqual(expected.replacingOccurrences(of: "/.+\\.swift", with: "", options: .regularExpression),
+                       result.replacingOccurrences(of: "/.+\\.swift", with: "", options: .regularExpression))
     }
 }
