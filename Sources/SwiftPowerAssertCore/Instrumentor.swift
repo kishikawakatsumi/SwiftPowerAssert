@@ -110,7 +110,7 @@ class Instrumentor {
             }
 
             if childExpression.rawValue == "declref_expr" && !childExpression.type.contains("->") {
-                let source = declarationReferenceExpression(childExpression, expression)
+                let source = completeExpressionSource(childExpression, expression)
                 
                 let formatter = Formatter()
                 let tokens = formatter.tokenize(source: expression.source)
@@ -119,7 +119,7 @@ class Instrumentor {
                 values[column] = formatter.format(tokens: formatter.tokenize(source: source))
             }
             if childExpression.rawValue == "member_ref_expr" {
-                let source = memberReferenceExpression(childExpression, expression)
+                let source = completeExpressionSource(childExpression, expression)
 
                 let formatter = Formatter()
                 let tokens = formatter.tokenize(source: expression.source)
@@ -141,6 +141,25 @@ class Instrumentor {
                 let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
                 values[column] = formatter.format(tokens: formatter.tokenize(source: source))
             }
+            if childExpression.rawValue == "magic_identifier_literal_expr" {
+                let source = completeExpressionSource(childExpression, expression)
+
+                let formatter = Formatter()
+                let tokens = formatter.tokenize(source: expression.source)
+
+                let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
+                values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+            }
+            if childExpression.rawValue == "array_expr" || childExpression.rawValue == "dictionary_expr" ||
+                childExpression.rawValue == "object_literal" {
+                let source = childExpression.source
+
+                let formatter = Formatter()
+                let tokens = formatter.tokenize(source: expression.source)
+
+                let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
+                values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+            }
             if childExpression.rawValue == "subscript_expr" {
                 let source = childExpression.source
 
@@ -151,7 +170,7 @@ class Instrumentor {
                 values[column] = formatter.format(tokens: formatter.tokenize(source: source))
             }
             if childExpression.rawValue == "call_expr" {
-                let source = callExpression(childExpression, expression)
+                let source = completeExpressionSource(childExpression, expression)
 
                 let formatter = Formatter()
                 let tokens = formatter.tokenize(source: expression.source)
@@ -167,7 +186,7 @@ class Instrumentor {
                 }
             }
             if childExpression.rawValue == "binary_expr" {
-                let source = binaryExpression(childExpression, expression)
+                let source = completeExpressionSource(childExpression, expression)
 
                 let formatter = Formatter()
                 let tokens = formatter.tokenize(source: expression.source)
@@ -182,7 +201,7 @@ class Instrumentor {
                 values[column] = (containsThrowsFunction ? "try! " : "") + formatter.format(tokens: formatter.tokenize(source: source))
             }
             if childExpression.rawValue == "if_expr" {
-                let source = ifExpression(childExpression, expression)
+                let source = completeExpressionSource(childExpression, expression)
 
                 let formatter = Formatter()
                 let tokens = formatter.tokenize(source: expression.source)
@@ -251,31 +270,7 @@ class Instrumentor {
         return code
     }
 
-    private func declarationReferenceExpression(_ child: Expression, _ parent: Expression) -> String {
-        let source = child.source
-        let rest = restOfExpression(child, parent)
-        return extendExpression(rest, source)
-    }
-
-    private func memberReferenceExpression(_ child: Expression, _ parent: Expression) -> String {
-        let source = child.source
-        let rest = restOfExpression(child, parent)
-        return extendExpression(rest, source)
-    }
-
-    private func binaryExpression(_ child: Expression, _ parent: Expression) -> String {
-        let source = child.source
-        let rest = restOfExpression(child, parent)
-        return extendExpression(rest, source)
-    }
-
-    private func ifExpression(_ child: Expression, _ parent: Expression) -> String {
-        let source = child.source
-        let rest = restOfExpression(child, parent)
-        return extendExpression(rest, source)
-    }
-
-    private func callExpression(_ child: Expression, _ parent: Expression) -> String {
+    private func completeExpressionSource(_ child: Expression, _ parent: Expression) -> String {
         let source = child.source
         let rest = restOfExpression(child, parent)
         return extendExpression(rest, source)
@@ -326,7 +321,7 @@ class Instrumentor {
         var result = source
         for character in rest {
             switch character {
-            case ".", ",", " ", "\t", "\n", "(", "[", "{", ")", "]", "}":
+            case ".", ",", " ", "\t", "\n", "(", "[", "{", ")", "]", "}", ":", ";":
                 return result
             default:
                 result += String(character)

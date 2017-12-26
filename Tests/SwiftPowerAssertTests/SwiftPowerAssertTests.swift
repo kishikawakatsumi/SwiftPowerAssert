@@ -325,9 +325,9 @@ class SwiftPowerAssertTests: XCTestCase {
 
         let expected = """
             assert([one, two, three].count == 10)
-                    |    |    |      |     |  |
-                    1    2    3      3     |  10
-                                           false
+                   ||    |    |      |     |  |
+                   |1    2    3      3     |  10
+                   [1, 2, 3]               false
 
             """
 
@@ -662,9 +662,9 @@ class SwiftPowerAssertTests: XCTestCase {
 
         let expected = """
             assert([one, two , three] .count == 10)
-                    |    |     |       |     |  |
-                    1    2     3       3     |  10
-                                             false
+                   ||    |     |       |     |  |
+                   |1    2     3       3     |  10
+                   [1, 2, 3]                 false
 
             """
 
@@ -786,5 +786,106 @@ class SwiftPowerAssertTests: XCTestCase {
 
         let result = try TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
+    }
+
+    func testArrayLiteralExpression3() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let zero = 0
+                    let one = 1
+                    let two = 2
+                    let three = 3
+
+                    assert([one, two, three].index(of: zero) == two)
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert([one, two, three].index(of: zero) == two)
+                   ||    |    |      |         |     |  |
+                   |1    2    3      nil       0     |  2
+                   [1, 2, 3]                         false
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
+    func testDictionaryLiteralExpression3() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let zero = 0
+                    let one = 1
+                    let two = 2
+                    let three = 3
+
+                    assert([zero: one, two: three].count == three)
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert([zero: one, two: three].count == three)
+                   ||     |    |    |      |     |  |
+                   |0     1    2    3      2     |  3
+                   [2: 3, 0: 1]                  false
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
+    func testMagicLiteralExpression() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    assert(#file == \"*.swift\" && #line == 1 && #column == 2 && #function == \"function\")
+                    assert(#colorLiteral(red: 0.8078431487, green: 0.02745098062, blue: 0.3333333433, alpha: 1) == .blue &&
+                           .blue == #colorLiteral(red: 0.8078431487, green: 0.02745098062, blue: 0.3333333433, alpha: 1))
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert(#file == "*.swift" && #line == 1 && #column == 2 && #function == "function")
+                   |     |  |         |  |     |  | |  |       |  | |  |         |  |
+                   |     |  "*.swift" |  19    |  1 |  32      |  2 |  |         |  "function"
+                   |     false        false    |    false      |    |  |         false
+                   |                           false           |    |  "testMethod()"
+                   |                                           |    false
+                   |                                           false
+                   "/var/folders/pk/pqq01lrx7qz335ft5_1xb7m40000gn/T/com.kishikawakatsumi.swift-power-assert.ookfmK/test.YH6QSJ.swift"
+            assert(#colorLiteral(red: 0.8078431487, green: 0.02745098062, blue: 0.3333333433, alpha: 1) == .blue && .blue == #colorLiteral(red: 0.8078431487, green: 0.02745098062, blue: 0.3333333433, alpha: 1))
+                   |                  |                    |                    |                    |  |   |    |   |    |  |                  |                    |                    |                    |
+                   |                  0                    0                    0                    1  |   |    |   |    |  |                  0                    0                    0                    1
+                   NSCustomColorSpace sRGB IEC61966-2.1 colorspace 0.807843 0.027451 0.333333 1         |   |    |   |    |  NSCustomColorSpace sRGB IEC61966-2.1 colorspace 0.807843 0.027451 0.333333 1
+                                                                                                        |   |    |   |    false
+                                                                                                        |   |    |   NSCalibratedRGBColorSpace 0 0 1 1
+                                                                                                        |   |    false
+                                                                                                        |   NSCalibratedRGBColorSpace 0 0 1 1
+                                                                                                        false
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected.replacingOccurrences(of: "/.+\\.swift", with: "", options: .regularExpression),
+                       result.replacingOccurrences(of: "/.+\\.swift", with: "", options: .regularExpression))
     }
 }
