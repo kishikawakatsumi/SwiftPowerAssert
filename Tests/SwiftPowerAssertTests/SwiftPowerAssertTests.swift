@@ -215,7 +215,7 @@ class SwiftPowerAssertTests: XCTestCase {
         let expected = """
             assert(array.description.hasPrefix("[") == false && array.description.hasPrefix("Hello") == true)
                    |     |           |         |    |  |     |  |     |           |         |        |  |
-                   |     [1, 2, 3]   true      [    |  false |  |     [1, 2, 3]   false     Hello    |  true
+                   |     "[1, 2, 3]" true      "["  |  false |  |     "[1, 2, 3]" false     "Hello"  |  true
                    [1, 2, 3]                        false    |  [1, 2, 3]                            false
                                                              false
 
@@ -368,10 +368,10 @@ class SwiftPowerAssertTests: XCTestCase {
         let expected = """
             assert((object.types[index] as! Person).name == bob.name)
                     |      |     |    |             |    |  |   |
-                    |      |     7    |             |    |  |   bob
+                    |      |     7    |             |    |  |   "bob"
                     |      |          |             |    |  Person(name: "bob", age: 5)
                     |      |          |             |    false
-                    |      |          |             alice
+                    |      |          |             "alice"
                     |      |          Person(name: "alice", age: 3)
                     |      [Optional("string"), Optional(98.599999999999994), Optional(true), Optional(false), nil, Optional(nan), Optional(inf), Optional(main.Person(name: "alice", age: 3))]
                     Object(types: [Optional("string"), Optional(98.599999999999994), Optional(true), Optional(false), nil, Optional(nan), Optional(inf), Optional(main.Person(name: "alice", age: 3))])
@@ -527,7 +527,7 @@ class SwiftPowerAssertTests: XCTestCase {
         let expected = """
             assert(array .description .hasPrefix(    "[" ) == false && array .description .hasPrefix    ("Hello"    ) == true)
                    |      |            |             |     |  |     |  |      |            |             |            |  |
-                   |      [1, 2, 3]    true          [     |  false |  |      [1, 2, 3]    false         Hello        |  true
+                   |      "[1, 2, 3]"  true          "["   |  false |  |      "[1, 2, 3]"  false         "Hello"      |  true
                    [1, 2, 3]                               false    |  [1, 2, 3]                                      false
                                                                     false
 
@@ -707,21 +707,21 @@ class SwiftPowerAssertTests: XCTestCase {
         let expected = """
             assert(try! JSONEncoder().encode(landmark) == "{ name: \\"Tokyo Tower\\" }".data(using: String.Encoding.utf8))
                         |             |      |         |  |                           |                           |
-                        |             |      |         |  { name: "Tokyo Tower" }     23 bytes                    Unicode (UTF-8)
+                        |             |      |         |  "{ name: "Tokyo Tower" }"   23 bytes                    Unicode (UTF-8)
                         |             |      |         false
                         |             |      Landmark(name: "Tokyo Tower", foundingYear: 1957, location: main.Coordinate(latitude: 35.658580999999998, longitude: 139.74543800000001))
                         |             99 bytes
                         Foundation.JSONEncoder
             assert(try! JSONEncoder().encode(landmark) == "{ name: \\"Tokyo Tower\\" }".data(using: .utf8))
                         |             |      |         |  |                           |            |
-                        |             |      |         |  { name: "Tokyo Tower" }     23 bytes     Unicode (UTF-8)
+                        |             |      |         |  "{ name: "Tokyo Tower" }"   23 bytes     Unicode (UTF-8)
                         |             |      |         false
                         |             |      Landmark(name: "Tokyo Tower", foundingYear: 1957, location: main.Coordinate(latitude: 35.658580999999998, longitude: 139.74543800000001))
                         |             99 bytes
                         Foundation.JSONEncoder
             assert(try! "{ name: \\"Tokyo Tower\\" }".data(using: String.Encoding.utf8) == JSONEncoder().encode(landmark))
                         |                           |                           |     |  |             |      |
-                        { name: "Tokyo Tower" }     23 bytes                    |     |  |             |      Landmark(name: "Tokyo Tower", foundingYear: 1957, location: main.Coordinate(latitude: 35.658580999999998, longitude: 139.74543800000001))
+                        "{ name: "Tokyo Tower" }"   23 bytes                    |     |  |             |      Landmark(name: "Tokyo Tower", foundingYear: 1957, location: main.Coordinate(latitude: 35.658580999999998, longitude: 139.74543800000001))
                                                                                 |     |  |             99 bytes
                                                                                 |     |  Foundation.JSONEncoder
                                                                                 |     false
@@ -753,6 +753,34 @@ class SwiftPowerAssertTests: XCTestCase {
                    |      |  |   |  |      |  |
                    1234   |  nil |  1234   |  1111
                           true   false     false
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
+    func testTernaryConditionalOperator() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let string = \"1234\"
+                    let number = Int(string)
+                    let hello = \"hello\"
+                    assert((number != nil ? string : \"hello\") == hello)
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert((number != nil ? string : "hello") == hello)
+                    |      |  |   | |        |        |  |
+                    1234   |  nil | "1234"   "hello"  |  "hello"
+                           true   "1234"              false
 
             """
 
