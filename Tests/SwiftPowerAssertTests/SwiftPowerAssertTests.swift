@@ -30,6 +30,9 @@ struct TestRunner {
 
         try source.write(toFile: sourceFilePath, atomically: true, encoding: .utf8)
 
+        var options = options
+        options.testable = true
+
         let runner = SwiftPowerAssert(sources: sourceFilePath, output: temporaryDirectory.path.asString, options: options)
         try runner.run()
 
@@ -866,12 +869,12 @@ class SwiftPowerAssertTests: XCTestCase {
         let expected = """
             assert(#file == "*.swift" && #line == 1 && #column == 2 && #function == "function")
                    |     |  |         |  |     |  | |  |       |  | |  |         |  |
-                   |     |  "*.swift" |  19    |  1 |  32      |  2 |  |         |  "function"
+                   |     |  "*.swift" |  495   |  1 |  32      |  2 |  |         |  "function"
                    |     false        false    |    false      |    |  |         false
                    |                           false           |    |  "testMethod()"
                    |                                           |    false
                    |                                           false
-                   "/var/folders/pk/pqq01lrx7qz335ft5_1xb7m40000gn/T/com.kishikawakatsumi.swift-power-assert.ookfmK/test.YH6QSJ.swift"
+                   "/var/folders/pk/pqq01lrx7qz335ft5_1xb7m40000gn/T/com.kishikawakatsumi.swift-power-assert.wJW1Qh/test.LaZw7q.swift"
             assert(#colorLiteral(red: 0.8078431487, green: 0.02745098062, blue: 0.3333333433, alpha: 1) == .blue && .blue == #colorLiteral(red: 0.8078431487, green: 0.02745098062, blue: 0.3333333433, alpha: 1))
                    |                  |                    |                    |                    |  |   |    |   |    |  |                  |                    |                    |                    |
                    |                  0                    0                    0                    1  |   |    |   |    |  |                  0                    0                    0                    1
@@ -1127,7 +1130,7 @@ class SwiftPowerAssertTests: XCTestCase {
                    ["hello", "hola", "bonjour", "안녕"]
             assert(greetings[keyPath: \\[String].first?.count] == 4)
                    |                                   |    | |  |
-                   ["hello", "hola", "bonjour", "안녕"]  |    5 |  4
+                   ["hello", "hola", "bonjour", "안녕"]|    5 |  4
                                                        |      false
                                                        Swift.KeyPath<Swift.Array<Swift.String>, Swift.Optional<Swift.Int>>
             assert(interestingNumbers[keyPath: \\[String: [Int]].["prime"]]! == [1, 2, 3])
@@ -1261,16 +1264,16 @@ class SwiftPowerAssertTests: XCTestCase {
         let source = """
             import XCTest
 
-                class SomeClass {
-                    var property = OtherClass()
-                    init() {}
-                }
+            class SomeClass {
+                var property = OtherClass()
+                init() {}
+            }
 
-                class OtherClass {
-                    func performAction() -> Bool {
-                        return false
-                    }
+            class OtherClass {
+                func performAction() -> Bool {
+                    return false
                 }
+            }
 
             class Tests: XCTestCase {
                 func testMethod() {
@@ -1326,5 +1329,82 @@ class SwiftPowerAssertTests: XCTestCase {
 
         let result = try TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
+    }
+
+    func testNonAsciiCharacters() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let dc = DateComponents(calendar: Calendar(identifier: .gregorian), timeZone: TimeZone(abbreviation: "JST")!, year: 1980, month: 10, day: 28)
+                    let date = dc.date!
+
+                    let tuple = (name: "岸川克己", age: 37, birthday: date)
+
+                    assert(tuple != (name: "岸川克己", age: 37, birthday: date))
+                    assert(tuple != ("岸川克己", 37, date))
+                    assert(tuple.name != ("岸川克己", 37, date).0 || tuple.age != ("岸川克己", 37, date).1)
+
+                    assert(tuple.name == ("😇岸川克己🇯🇵", 37, date).0 || tuple.age != ("岸川克己", 37, date).1)
+                    assert(tuple.name != ("岸川克己", 37, date).0 || tuple.age != ("😇岸川克己🇯🇵", 37, date).1)
+                }
+            }
+
+            Tests().testMethod()
+            """
+
+        let expected = """
+            assert(tuple != (name: "岸川克己", age: 37, birthday: date))
+                   |     |         |                |             |
+                   |     false     "岸川克己"       37            1980-10-27 15:00:00 +0000
+                   (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
+            assert(tuple != ("岸川克己", 37, date))
+                   |     |   |           |   |
+                   |     |   "岸川克己"  37  1980-10-27 15:00:00 +0000
+                   |     false
+                   (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
+            assert(tuple.name != ("岸川克己", 37, date).0 || tuple.age != ("岸川克己", 37, date).1)
+                   |     |    |   |           |   |     | |  |     |   |   |           |   |     |
+                   |     |    |   "岸川克己"  37  |     | |  |     37  |   "岸川克己"  37  |     37
+                   |     |    false               |     | |  |         false               1980-10-27 15:00:00 +0000
+                   |     "岸川克己"               |     | |  (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
+                   |                              |     | false
+                   |                              |     "岸川克己"
+                   |                              1980-10-27 15:00:00 +0000
+                   (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
+            assert(tuple.name == ("😇岸川克己🇯🇵", 37, date).0 || tuple.age != ("岸川克己", 37, date).1)
+                   |     |    |   |               |   |     | |  |     |   |   |           |   |     |
+                   |     |    |   "😇岸川克己🇯🇵"  37  |     | |  |     37  |   "岸川克己"  37  |     37
+                   |     |    false                   |     | |  |         false               1980-10-27 15:00:00 +0000
+                   |     "岸川克己"                   |     | |  (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
+                   |                                  |     | false
+                   |                                  |     "😇岸川克己🇯🇵"
+                   |                                  1980-10-27 15:00:00 +0000
+                   (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
+            assert(tuple.name != ("岸川克己", 37, date).0 || tuple.age != ("😇岸川克己🇯🇵", 37, date).1)
+                   |     |    |   |           |   |     | |  |     |   |   |               |   |     |
+                   |     |    |   "岸川克己"  37  |     | |  |     37  |   "😇岸川克己🇯🇵"  37  |     37
+                   |     |    false               |     | |  |         false                   1980-10-27 15:00:00 +0000
+                   |     "岸川克己"               |     | |  (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
+                   |                              |     | false
+                   |                              |     "岸川克己"
+                   |                              1980-10-27 15:00:00 +0000
+                   (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
+
+            """
+
+        let result = try TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
+    func testDisplayWidth() throws {
+        XCTAssertEqual(DisplayWidth.of("Katsumi Kishikawa", inEastAsian: true), 17)
+        XCTAssertEqual(DisplayWidth.of("岸川克己", inEastAsian: true), 8)
+        XCTAssertEqual(DisplayWidth.of("岸川 克己", inEastAsian: true), 9)
+        XCTAssertEqual(DisplayWidth.of("岸川克己😇", inEastAsian: true), 10)
+        XCTAssertEqual(DisplayWidth.of("岸川 克己😇", inEastAsian: true), 11)
+        XCTAssertEqual(DisplayWidth.of("😇岸川克己🇯🇵", inEastAsian: true), 12)
+        XCTAssertEqual(DisplayWidth.of("😇岸川 克己🇯🇵", inEastAsian: true), 13)
     }
 }

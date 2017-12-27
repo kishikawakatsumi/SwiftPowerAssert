@@ -28,7 +28,7 @@ class Instrumentor {
         var index = 0
         var characterCount = 0
         source.enumerateLines { (line, stop) in
-            let count = line.count
+            let count = line.utf8.count
             sourceIndices[index] = characterCount + count + 1
             index += 1
             characterCount += count + 1
@@ -71,20 +71,22 @@ class Instrumentor {
             let sourceLocation = instrument.0
             let code = instrument.1
 
+            let utf8 = source.utf8
             let startIndex: String.Index
             if sourceLocation.start.line > 0 {
-                startIndex = source.index(source.startIndex, offsetBy: sourceIndices[sourceLocation.start.line - 1]! + sourceLocation.start.column)
+                startIndex = utf8.index(utf8.startIndex, offsetBy: sourceIndices[sourceLocation.start.line - 1]! + sourceLocation.start.column)
             } else {
-                startIndex = source.index(source.startIndex, offsetBy: sourceLocation.start.column)
+                startIndex = utf8.index(utf8.startIndex, offsetBy: sourceLocation.start.column)
             }
             let endIndex: String.Index
             if sourceLocation.end.line > 0 {
-                endIndex = source.index(source.startIndex, offsetBy: sourceIndices[sourceLocation.end.line - 1]! + sourceLocation.end.column)
+                endIndex = utf8.index(utf8.startIndex, offsetBy: sourceIndices[sourceLocation.end.line - 1]! + sourceLocation.end.column)
             } else {
-                endIndex = source.index(source.startIndex, offsetBy: sourceLocation.end.column)
+                endIndex = utf8.index(utf8.startIndex, offsetBy: sourceLocation.end.column)
             }
-
-            instrumented.replaceSubrange(startIndex...endIndex, with: code)
+            let prefix = instrumented.utf8.prefix(upTo: startIndex)
+            let suffix = instrumented.utf8.suffix(from: endIndex)
+            instrumented = String(prefix)! + code + String(suffix)!
         }
 
         return instrumented
@@ -214,67 +216,61 @@ class Instrumentor {
 
         var recordValues = ""
         for (key, value) in values {
-            recordValues += "valueColumns[\(key - 1)] = \"\\(toString(\(value)))\"\n"
+            recordValues += "valueColumns[\(key)] = \"\\(toString(\(value)))\"\n"
         }
 
         let code =
         """
 
         do {
-        func toString<T>(_ value: T?) -> String {
-        switch value {
-        case .some(let v) where v is String: return \"\\"\\(v)\\\""
-        case .some(let v): return \"\\(v)\"
-        case .none: return \"nil\"
-        }
-        }
-        var valueColumns = [Int: String]()
-        let condition = { () -> Bool in
-        \(recordValues)
-        return \(formatter.format(tokens: formatter.tokenize(source: expression.expressions[1].source)))
-        }()
-        if !condition {
-        func align(current: inout Int, column: Int, string: String) {
-        while current < column {
-        print(\" \", terminator: \"\")
-        current += 1
-        }
-        print(string, terminator: \"\")
-        current += string.count
-        }
-        print(\"\(formatter.escaped(tokens: formatter.tokenize(source: expression.source)))\")
-        var values = Array(valueColumns).sorted { $0.0 < $1.0 }
-        var current = 0
-        for value in values {
-        align(current: &current, column: value.0, string: \"|\")
-        }
-        print()
-        while !values.isEmpty {
-        var current = 0
-        var index = 0
-        while index < values.count {
-        if index == values.count - 1 || values[index].0 + values[index].1.count < values[index + 1].0 {
-        align(current: &current, column: values[index].0, string: values[index].1)
-        values.remove(at: index)
-        } else {
-        align(current: &current, column: values[index].0, string: \"|\")
-        index += 1
-        }
-        }
-        print()
-        }
-        }
+            func toString<T>(_ value: T?) -> String {
+                switch value {
+                case .some(let v) where v is String: return \"\\"\\(v)\\\""
+                case .some(let v): return \"\\(v)\"
+                case .none: return \"nil\"
+                }
+            }
+            var valueColumns = [Int: String]()
+            let condition = { () -> Bool in
+                \(recordValues)
+                return \(formatter.format(tokens: formatter.tokenize(source: expression.expressions[1].source)))
+            }()
+            if !condition {
+                func align(current: inout Int, column: Int, string: String) {
+                    while current < column - 1 {
+                        print(\" \", terminator: \"\")
+                        current += 1
+                    }
+                    print(string, terminator: \"\")
+                    current += DisplayWidth.of(string, inEastAsian: true)
+                }
+                print(\"\(formatter.escaped(tokens: formatter.tokenize(source: expression.source)))\")
+                var values = Array(valueColumns).sorted { $0.0 < $1.0 }
+                var current = 0
+                for value in values {
+                    align(current: &current, column: value.0, string: \"|\")
+                }
+                print()
+                while !values.isEmpty {
+                    var current = 0
+                    var index = 0
+                    while index < values.count {
+                        if index == values.count - 1 || values[index].0 + values[index].1.count < values[index + 1].0 {
+                            align(current: &current, column: values[index].0, string: values[index].1)
+                            values.remove(at: index)
+                        } else {
+                            align(current: &current, column: values[index].0, string: \"|\")
+                            index += 1
+                        }
+                    }
+                    print()
+                }
+            }
         }
         
         """
 
         return code
-    }
-
-    private func completeExpressionSource(_ child: Expression, _ parent: Expression) -> String {
-        let source = child.source
-        let rest = restOfExpression(child, parent)
-        return extendExpression(rest, source)
     }
 
     private func stringLiteralExpression(_ child: Expression, _ parent: Expression) -> String {
@@ -301,21 +297,28 @@ class Instrumentor {
         }
     }
 
+    private func completeExpressionSource(_ child: Expression, _ parent: Expression) -> String {
+        let source = child.source
+        let rest = restOfExpression(child, parent)
+        return extendExpression(rest, source)
+    }
+
     private func restOfExpression(_ child: Expression, _ parent: Expression) -> String {
+        let utf8 = source.utf8
         let startIndex: String.Index
         if child.range.end.line > 0 {
-            startIndex = source.index(source.startIndex, offsetBy: sourceIndices[child.range.end.line - 1]! + child.range.end.column)
+            startIndex = utf8.index(utf8.startIndex, offsetBy: sourceIndices[child.range.end.line - 1]! + child.range.end.column)
         } else {
-            startIndex = source.index(source.startIndex, offsetBy: child.range.end.column)
+            startIndex = utf8.index(utf8.startIndex, offsetBy: child.range.end.column)
         }
         let endIndex: String.Index
         if parent.range.end.line > 0 {
-            endIndex = source.index(source.startIndex, offsetBy: sourceIndices[parent.range.end.line - 1]! + parent.range.end.column)
+            endIndex = utf8.index(utf8.startIndex, offsetBy: sourceIndices[parent.range.end.line - 1]! + parent.range.end.column)
         } else {
-            endIndex = source.index(source.startIndex, offsetBy: parent.range.end.column)
+            endIndex = utf8.index(utf8.startIndex, offsetBy: parent.range.end.column)
         }
 
-        return String(source[startIndex...endIndex])
+        return String(utf8[startIndex..<endIndex])!
     }
 
     private func extendExpression(_ rest: String, _ source: String) -> String {
@@ -346,14 +349,14 @@ class Instrumentor {
             switch token.type {
             case .token:
                 if lineIndex < endLineIndex {
-                    columnIndex += token.value.count
+                    columnIndex += token.value.utf8.count
                 } else if lineIndex == endLineIndex {
                     columnIndex += column
                     break loop
                 }
             case .string:
                 if lineIndex < endLineIndex {
-                    columnIndex += ("\"" + token.value + "\"").count
+                    columnIndex += ("\"" + token.value + "\"").utf8.count
                 } else if lineIndex == endLineIndex {
                     columnIndex += column
                     break loop
@@ -370,7 +373,11 @@ class Instrumentor {
             }
         }
 
-        return columnIndex - indent
+        let formatter = Formatter()
+        let whole = formatter.format(tokens: formatter.tokenize(source: parent.source)).utf8
+        let prefix = whole.prefix(upTo: whole.index(whole.startIndex, offsetBy: columnIndex - indent))
+        
+        return DisplayWidth.of(String(prefix)!, inEastAsian: true)
     }
 
     class Formatter {

@@ -106,7 +106,12 @@ public final class SwiftPowerAssert {
         let root = parser.parse(root: node)
 
         let instrumentor = Instrumentor(source: try String(contentsOf: fileURL))
-        let source = instrumentor.instrument(node: root)
+        let source: String
+        if options.testable {
+            source = DisplayWidth.myself + "\n\n\n" + instrumentor.instrument(node: root)
+        } else {
+            source = instrumentor.instrument(node: root) + "\n\n\n" + DisplayWidth.myself
+        }
 
         var isDirectory: ObjCBool = false
         if let output = output, FileManager.default.fileExists(atPath: output, isDirectory: &isDirectory) && isDirectory.boolValue {
@@ -134,10 +139,10 @@ extension SwiftPowerAssertError: CustomStringConvertible {
 }
 
 public struct Options {
-    public let sdk = SDK.macosx
-    public let arch = Arch.x86_64
-    public let deploymentTarget = "10.10"
-    public let testable: Bool = false
+    public var sdk = SDK.macosx
+    public var arch = Arch.x86_64
+    public var deploymentTarget = "10.10"
+    public var testable: Bool = false
 
     public init() {}
 }
