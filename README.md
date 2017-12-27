@@ -12,7 +12,7 @@ What is `SwiftPowerAssert`?
 
  * is an implementation of "Power Assert" concept in Swift.
  * provides descriptive assertion messages through simple interface.
- * __No API is the best API__. With `SwiftPowerAssert`, __you don't need to learn many assertion library APIs__ (in most cases, all you need to remember is just an `assert(any_expression)` function)
+ * With `SwiftPowerAssert`, __you don't need to learn many assertion library APIs__ (in most cases, all you need to remember is just an `assert(any_expression)` function)
  * __Stop memorizing tons of assertion APIs. Just create expressions that return a truthy value or not__ and power-assert will show it to you right on the screen as part of your failure message without you having to type in a message at all.
  * pull-requests, issue reports and patches are always welcomed.
 
