@@ -391,18 +391,16 @@ class Parser {
         }
         var text = ""
         for index in start.line...end.line {
+            let line = lines[index]
+            let utf8 = line.utf8
             if start.line == end.line {
-                let line = lines[index]
-                text += line[line.index(line.startIndex, offsetBy: start.column)..<line.index(line.startIndex, offsetBy: end.column)]
+                text += String(utf8[utf8.index(utf8.startIndex, offsetBy: start.column)..<utf8.index(utf8.startIndex, offsetBy: end.column)])!
             } else {
                 if index == start.line {
-                    let line = lines[index]
-                    text += line[line.index(line.startIndex, offsetBy: start.column)...]
+                    text += String(utf8[utf8.index(utf8.startIndex, offsetBy: start.column)...])!
                 } else if index == end.line {
-                    let line = lines[index]
-                    text += "\n" + line[line.startIndex..<line.index(line.startIndex, offsetBy: end.column)]
+                    text += "\n" + String(utf8[utf8.startIndex..<utf8.index(utf8.startIndex, offsetBy: end.column)])!
                 } else {
-                    let line = lines[index]
                     text += "\n" + line
                 }
             }
