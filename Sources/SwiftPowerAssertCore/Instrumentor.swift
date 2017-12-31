@@ -318,9 +318,9 @@ class Instrumentor {
             }
             func __toString<T>(_ value: T?) -> String {
                 switch value {
-                case .some(let v) where v is String: return \"\\"\\(v)\\\""
-                case .some(let v): return \"\\(v)\"
-                case .none: return \"nil\"
+                case .some(let v) where v is String: return "\\"\\(v)\\"".replacingOccurrences(of: "\\n", with: " ")
+                case .some(let v): return "\\(v)".replacingOccurrences(of: "\\n", with: " ")
+                case .none: return "nil"
                 }
             }
             var valueColumns = [Int: String]()
@@ -331,17 +331,17 @@ class Instrumentor {
             if \(verbose) || !condition {
                 func align(current: inout Int, column: Int, string: String) {
                     while current < column - 1 {
-                        print(\" \", terminator: \"\")
+                        print(" ", terminator: "")
                         current += 1
                     }
-                    print(string, terminator: \"\")
+                    print(string, terminator: "")
                     current += __DisplayWidth.of(string, inEastAsian: true)
                 }
-                print(\"\(assertion)\")
+                print("\(assertion)")
                 var values = Array(valueColumns).sorted { $0.0 < $1.0 }
                 var current = 0
                 for value in values {
-                    align(current: &current, column: value.0, string: \"|\")
+                    align(current: &current, column: value.0, string: "|")
                 }
                 print()
                 while !values.isEmpty {
@@ -352,7 +352,7 @@ class Instrumentor {
                             align(current: &current, column: values[index].0, string: values[index].1)
                             values.remove(at: index)
                         } else {
-                            align(current: &current, column: values[index].0, string: \"|\")
+                            align(current: &current, column: values[index].0, string: "|")
                             index += 1
                         }
                     }
