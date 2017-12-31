@@ -1,14 +1,11 @@
 //===----------------------------------------------------------------------===//
-// Automatically Generated From Tools/UnicodeDisplayWidth.swift
-// Do Not Edit Directly!
+// Automatically Generated From Tools/GenerateUtilities.swift
 //===----------------------------------------------------------------------===//
-
-// RUN: Tools/UnicodeDisplayWidth.swift
 
 import Foundation
 
-public class DisplayWidth {
-    public static func of(_ s: String, inEastAsian: Bool = false) -> Int {
+public class __DisplayWidth {
+    static func of(_ s: String, inEastAsian: Bool = false) -> Int {
         return s.unicodeScalars.reduce(0) { $0 + of($1, inEastAsian: inEastAsian) }
     }
 
@@ -477,17 +474,15 @@ public class DisplayWidth {
     }
 }
 
-public extension DisplayWidth {
+extension __DisplayWidth {
     public static var myself: String {
         let myself = """
             //===----------------------------------------------------------------------===//
-            // Automatically Generated From Tools/UnicodeDisplayWidth.swift
-            // Do Not Edit Directly!
+            // Automatically Generated From Tools/GenerateUtilities.swift
             //===----------------------------------------------------------------------===//
-            // RUN: Tools/UnicodeDisplayWidth.swift
             import Foundation
-            public class DisplayWidth {
-                public static func of(_ s: String, inEastAsian: Bool = false) -> Int {
+            public class __DisplayWidth {
+                static func of(_ s: String, inEastAsian: Bool = false) -> Int {
                     return s.unicodeScalars.reduce(0) { $0 + of($1, inEastAsian: inEastAsian) }
                 }
                 private static func of(_ s: UnicodeScalar, inEastAsian: Bool) -> Int {

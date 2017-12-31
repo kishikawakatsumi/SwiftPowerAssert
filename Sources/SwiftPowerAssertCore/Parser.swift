@@ -294,7 +294,7 @@ class Parser {
                 case (.token, "result"):
                     result = parseResultNode(node: node)
                 case (.token, "brace_stmt"):
-                    body.append(contentsOf: parseBraceStatementNode(node: node))
+                    body.append(contentsOf: parseStatementNode(node: node))
                 default:
                     break
                 }
@@ -314,7 +314,7 @@ class Parser {
         return FunctionDeclaration(accessLevel: accessLevel, modifiers: modifiers, name: name, parameters: parameters, throwBehavior: throwBehavior, result: result, body: body)
     }
 
-    private func parseBraceStatementNode(node: Node<[Token]>) -> [Statement] {
+    private func parseStatementNode(node: Node<[Token]>) -> [Statement] {
         var statements = [Statement]()
         for node in node.children {
             for token in node.value {
@@ -323,6 +323,8 @@ class Parser {
                     statements.append(.declaration(.variable(parseVariableDeclarationNode(node: node))))
                 case (.token, "call_expr"):
                     statements.append(.expression(parseExpressionNode(node: node)))
+                case (.token, let value) where value.hasSuffix("_stmt"):
+                    statements.append(contentsOf: parseStatementNode(node: node))
                 default:
                     break
                 }

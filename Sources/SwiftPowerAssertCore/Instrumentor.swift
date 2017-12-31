@@ -94,15 +94,25 @@ class Instrumentor {
 
     private func instrument(functionCall expression: Expression) -> String {
         if expression.rawValue == "call_expr" {
-            if !expression.expressions.isEmpty, let decl = expression.expressions[0].decl, decl == "Swift.(file).assert(_:_:file:line:)" {
-                let code = instrument(expression)
-                return code
+            if !expression.expressions.isEmpty, let decl = expression.expressions[0].decl {
+                switch decl {
+                case "Swift.(file).assert(_:_:file:line:)":
+                    let values = recordValues(expression)
+                    return instrument(expression: expression, with: values)
+                case "XCTest.(file).XCTAssertEqual(_:_:_:file:line:)":
+                    if let tupleExpression = findFirst(expression, where: { $0.rawValue == "tuple_expr" }) {
+                        let values = recordValues(expression)
+                        return instrument(XCTAssertEqual: expression, tupleExpression: tupleExpression, values: values)
+                    }
+                default:
+                    break
+                }
             }
         }
         return expression.source
     }
 
-    private func instrument(_ expression: Expression) -> String {
+    private func recordValues(_ expression: Expression) -> [Int: String] {
         var values = [Int: String]()
         let formatter = Formatter()
         
@@ -114,8 +124,6 @@ class Instrumentor {
             if (childExpression.rawValue == "declref_expr" && !childExpression.type.contains("->")) ||
                 childExpression.rawValue == "magic_identifier_literal_expr" {
                 let source = completeExpressionSource(childExpression, expression)
-                
-                let formatter = Formatter()
                 let tokens = formatter.tokenize(source: expression.source)
                 
                 let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
@@ -123,8 +131,6 @@ class Instrumentor {
             }
             if childExpression.rawValue == "member_ref_expr" ||  childExpression.rawValue == "dot_self_expr" {
                 let source = completeExpressionSource(childExpression, expression)
-
-                let formatter = Formatter()
                 let tokens = formatter.tokenize(source: expression.source)
 
                 let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
@@ -137,8 +143,6 @@ class Instrumentor {
             }
             if childExpression.rawValue == "tuple_element_expr" || childExpression.rawValue == "keypath_expr" {
                 let source = completeExpressionSource(childExpression, expression)
-
-                let formatter = Formatter()
                 let tokens = formatter.tokenize(source: expression.source)
 
                 let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
@@ -146,8 +150,6 @@ class Instrumentor {
             }
             if childExpression.rawValue == "string_literal_expr" {
                 let source = stringLiteralExpression(childExpression, expression)
-
-                let formatter = Formatter()
                 let tokens = formatter.tokenize(source: expression.source)
 
                 let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
@@ -156,8 +158,6 @@ class Instrumentor {
             if childExpression.rawValue == "array_expr" || childExpression.rawValue == "dictionary_expr" ||
                 childExpression.rawValue == "object_literal" {
                 let source = childExpression.source
-
-                let formatter = Formatter()
                 let tokens = formatter.tokenize(source: expression.source)
 
                 let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
@@ -165,8 +165,6 @@ class Instrumentor {
             }
             if childExpression.rawValue == "subscript_expr" || childExpression.rawValue == "keypath_application_expr" {
                 let source = childExpression.source
-
-                let formatter = Formatter()
                 let tokens = formatter.tokenize(source: expression.source)
 
                 let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
@@ -174,8 +172,6 @@ class Instrumentor {
             }
             if childExpression.rawValue == "call_expr" {
                 let source = completeExpressionSource(childExpression, expression)
-
-                let formatter = Formatter()
                 let tokens = formatter.tokenize(source: expression.source)
 
                 let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
@@ -190,8 +186,6 @@ class Instrumentor {
             }
             if childExpression.rawValue == "binary_expr" {
                 let source = completeExpressionSource(childExpression, expression)
-
-                let formatter = Formatter()
                 let tokens = formatter.tokenize(source: expression.source)
 
                 var containsThrowsFunction = false
@@ -205,8 +199,6 @@ class Instrumentor {
             }
             if childExpression.rawValue == "if_expr" {
                 let source = completeExpressionSource(childExpression, expression)
-
-                let formatter = Formatter()
                 let tokens = formatter.tokenize(source: expression.source)
 
                 let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
@@ -214,16 +206,100 @@ class Instrumentor {
             }
         }
 
-        var recordValues = ""
-        for (key, value) in values {
-            recordValues += "valueColumns[\(key)] = \"\\(toString(\(value)))\"\n"
-        }
+        return values
+    }
 
-        let code =
-        """
+    func recordValuesCodeFragment(values: [Int: String]) -> String {
+        var code = ""
+        for (key, value) in values {
+            code += "valueColumns[\(key)] = \"\\(__toString(\(value)))\"\n"
+        }
+        return code
+    }
+
+    func instrument(XCTAssertEqual expression: Expression, tupleExpression: Expression, values: [Int: String]) -> String {
+        let formatter = Formatter()
+        let recordValues = recordValuesCodeFragment(values: values)
+        let condition = "__Util.condition(\(formatter.format(tokens: formatter.tokenize(source: tupleExpression.source))))"
+        let assertion = formatter.escaped(tokens: formatter.tokenize(source: expression.source))
+        return instrument(expression: expression, recordValues: recordValues, condition: condition, assertion: assertion)
+    }
+
+    func instrument(expression: Expression, with values: [Int: String]) -> String {
+        let formatter = Formatter()
+        let recordValues = recordValuesCodeFragment(values: values)
+        let condition = formatter.format(tokens: formatter.tokenize(source: expression.expressions[1].source))
+        let assertion = formatter.escaped(tokens: formatter.tokenize(source: expression.source))
+        return instrument(expression: expression, recordValues: recordValues, condition: condition, assertion: assertion)
+    }
+
+    func instrument(expression: Expression, recordValues: String, condition: String, assertion: String) -> String {
+        return """
 
         do {
-            func toString<T>(_ value: T?) -> String {
+            struct __Util {
+                static func condition<T>(_ parameters: (lhs: T?, rhs: T?)) -> Bool where T: Equatable {
+                    return parameters.lhs == parameters.rhs
+                }
+                static func condition<T>(_ parameters: (lhs: T?, rhs: T?, message: String)) -> Bool where T: Equatable {
+                    return condition((parameters.lhs, parameters.rhs))
+                }
+                static func condition<T>(_ parameters: (lhs: T?, rhs: T?, message: String, file: StaticString)) -> Bool where T: Equatable {
+                    return condition((parameters.lhs, parameters.rhs))
+                }
+                static func condition<T>(_ parameters: (lhs: T?, rhs: T?, message: String, file: StaticString, line: UInt)) -> Bool where T: Equatable {
+                    return condition((parameters.lhs, parameters.rhs))
+                }
+                static func condition<T>(_ parameters: (lhs: [T], rhs: [T])) -> Bool where T: Equatable {
+                    return parameters.lhs == parameters.rhs
+                }
+                static func condition<T>(_ parameters: (lhs: [T], rhs: [T], message: String)) -> Bool where T: Equatable {
+                    return condition((parameters.lhs, parameters.rhs))
+                }
+                static func condition<T>(_ parameters: (lhs: [T], rhs: [T], message: String, file: StaticString)) -> Bool where T: Equatable {
+                    return condition((parameters.lhs, parameters.rhs))
+                }
+                static func condition<T>(_ parameters: (lhs: [T], rhs: [T], message: String, file: StaticString, line: UInt)) -> Bool where T: Equatable {
+                    return condition((parameters.lhs, parameters.rhs))
+                }
+                static func condition<T>(_ parameters: (lhs: ArraySlice<T>, rhs: ArraySlice<T>)) -> Bool where T: Equatable {
+                    return parameters.lhs == parameters.rhs
+                }
+                static func condition<T>(_ parameters: (lhs: ArraySlice<T>, rhs: ArraySlice<T>, message: String)) -> Bool where T: Equatable {
+                    return condition((parameters.lhs, parameters.rhs))
+                }
+                static func condition<T>(_ parameters: (lhs: ArraySlice<T>, rhs: ArraySlice<T>, message: String, file: StaticString)) -> Bool where T: Equatable {
+                    return condition((parameters.lhs, parameters.rhs))
+                }
+                static func condition<T>(_ parameters: (lhs: ArraySlice<T>, rhs: ArraySlice<T>, message: String, file: StaticString, line: UInt)) -> Bool where T: Equatable {
+                    return condition((parameters.lhs, parameters.rhs))
+                }
+                static func condition<T>(_ parameters: (lhs: ContiguousArray<T>, rhs: ContiguousArray<T>)) -> Bool where T: Equatable {
+                    return parameters.lhs == parameters.rhs
+                }
+                static func condition<T>(_ parameters: (lhs: ContiguousArray<T>, rhs: ContiguousArray<T>, message: String)) -> Bool where T: Equatable {
+                    return condition((parameters.lhs, parameters.rhs))
+                }
+                static func condition<T>(_ parameters: (lhs: ContiguousArray<T>, rhs: ContiguousArray<T>, message: String, file: StaticString)) -> Bool where T: Equatable {
+                    return condition((parameters.lhs, parameters.rhs))
+                }
+                static func condition<T>(_ parameters: (lhs: ContiguousArray<T>, rhs: ContiguousArray<T>, message: String, file: StaticString, line: UInt)) -> Bool where T: Equatable {
+                    return condition((parameters.lhs, parameters.rhs))
+                }
+                static func condition<T, U>(_ parameters: (lhs: [T: U], rhs: [T: U])) -> Bool where U: Equatable {
+                    return parameters.lhs == parameters.rhs
+                }
+                static func condition<T, U>(_ parameters: (lhs: [T: U], rhs: [T: U], message: String)) -> Bool where U: Equatable {
+                    return condition((parameters.lhs, parameters.rhs))
+                }
+                static func condition<T, U>(_ parameters: (lhs: [T: U], rhs: [T: U], message: String, file: StaticString)) -> Bool where U: Equatable {
+                    return condition((parameters.lhs, parameters.rhs))
+                }
+                static func condition<T, U>(_ parameters: (lhs: [T: U], rhs: [T: U], message: String, file: StaticString, line: UInt)) -> Bool where U: Equatable {
+                    return condition((parameters.lhs, parameters.rhs))
+                }
+            }
+            func __toString<T>(_ value: T?) -> String {
                 switch value {
                 case .some(let v) where v is String: return \"\\"\\(v)\\\""
                 case .some(let v): return \"\\(v)\"
@@ -233,7 +309,7 @@ class Instrumentor {
             var valueColumns = [Int: String]()
             let condition = { () -> Bool in
                 \(recordValues)
-                return \(formatter.format(tokens: formatter.tokenize(source: expression.expressions[1].source)))
+                return \(condition)
             }()
             if !condition {
                 func align(current: inout Int, column: Int, string: String) {
@@ -242,9 +318,9 @@ class Instrumentor {
                         current += 1
                     }
                     print(string, terminator: \"\")
-                    current += DisplayWidth.of(string, inEastAsian: true)
+                    current += __DisplayWidth.of(string, inEastAsian: true)
                 }
-                print(\"\(formatter.escaped(tokens: formatter.tokenize(source: expression.source)))\")
+                print(\"\(assertion)\")
                 var values = Array(valueColumns).sorted { $0.0 < $1.0 }
                 var current = 0
                 for value in values {
@@ -267,10 +343,8 @@ class Instrumentor {
                 }
             }
         }
-        
-        """
 
-        return code
+        """
     }
 
     private func stringLiteralExpression(_ child: Expression, _ parent: Expression) -> String {
@@ -288,6 +362,18 @@ class Instrumentor {
             }
         }
         return source
+    }
+
+    func findFirst(_ expression: Expression, where closure: (_ expression: Expression) -> Bool) -> Expression? {
+        if closure(expression) {
+            return expression
+        }
+        for expression in expression.expressions {
+            if let found = findFirst(expression, where: closure) {
+                return found
+            }
+        }
+        return nil
     }
 
     private func traverse(_ expression: Expression, closure: (_ expression: Expression) -> ()) {
@@ -377,7 +463,7 @@ class Instrumentor {
         let whole = formatter.format(tokens: formatter.tokenize(source: parent.source)).utf8
         let prefix = whole.prefix(upTo: whole.index(whole.startIndex, offsetBy: columnIndex - indent))
         
-        return DisplayWidth.of(String(prefix)!, inEastAsian: true)
+        return __DisplayWidth.of(String(prefix)!, inEastAsian: true)
     }
 
     class Formatter {

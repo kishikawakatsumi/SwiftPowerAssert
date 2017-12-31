@@ -17,34 +17,64 @@
 ////////////////////////////////////////////////////////////////////////////
 
 import Foundation
+import Basic
 import Utility
 import SwiftPowerAssertCore
 
-do {
-    let parser = ArgumentParser(commandName: "swift-power-assert", usage: "filename [--input naughty_words.txt]", overview: "Swearcheck checks a file of code for swearing, because let's face it: you were angry coding last night.")
-    let instrument = parser.add(subparser: "instrument", overview: "Instrument test files.")
-    let sources = instrument.add(positional: "sources", kind: String.self, optional: false, usage: "file or directory")
-    let output = instrument.add(option: "--output", shortName: "-o", kind: String.self, usage: "A filename containing naughty words in your language")
-
-    let args = Array(CommandLine.arguments.dropFirst())
-    let result = try parser.parse(args)
-
-    guard let input = result.get(sources) else {
-        throw ArgumentParserError.expectedArguments(parser, ["sources"])
-    }
-
-    let runner: SwiftPowerAssert
-    if let output = result.get(output) {
-        runner = SwiftPowerAssert(sources: input, output: output)
-    } else {
-        runner = SwiftPowerAssert(sources: input)
-    }
-    try runner.run()
-} catch ArgumentParserError.expectedValue(let value) {
-    print("Missing value for argument \(value).")
-} catch ArgumentParserError.expectedArguments(_, let stringArray) {
-    print("Missing arguments: \(stringArray.joined()).")
-} catch {
-    print(error.localizedDescription)
+enum CommandError: Error {
+    case writeFailed(String, Error)
+    case fileExists(String)
+    case noUnitTestBundle
+    case argumentError(String)
+    case buildFailed(Error)
+    case instrumentFailed(Error)
+    case executionFailed(Error)
 }
 
+do {
+    let parser = ArgumentParser(commandName: "swift-power-assert", usage: "SUBCOMMAND", overview: "SwiftPowerAssert, provide diagrammed assertions in Swift")
+
+    let test = parser.add(subparser: "test", overview: "Run XCTest with power assertion enabled.")
+    let xcargs = test.add(option: "--xcargs", shortName: "-x", kind: [String].self, strategy: .remaining, usage: "swift-power-assert test --xcargs -workspace <workspacename> -scheme <schemeName> [<buildaction>]...")
+
+    let arguments = Array(CommandLine.arguments.dropFirst())
+    let result = try parser.parse(arguments)
+
+    switch result.subparser(parser) {
+    case let subcommand? where subcommand == "test":
+        if let xcodeArguments = result.get(xcargs) {
+            let command = TestCommand()
+            try command.run(xcarguments: xcodeArguments)
+        } else {
+            test.printUsage(on: stdoutStream)
+        }
+    default:
+        parser.printUsage(on: stdoutStream)
+    }
+    exit(0)
+} catch ArgumentParserError.unknownOption(let option) {
+    print("swift-power-assert: error: unknown option \(option); use --help to list available options")
+} catch ArgumentParserError.invalidValue(let argument, let error) {
+    print("swift-power-assert: error: \(error) for argument \(argument); use --help to print usage")
+} catch ArgumentParserError.expectedValue(let option) {
+    print("swift-power-assert: error: option \(option) requires a value; provide a value using '\(option) <value>'")
+} catch ArgumentParserError.unexpectedArgument(let argument) {
+    print("swift-power-assert: error: unexpected argument \(argument); use --help to list available arguments")
+} catch ArgumentParserError.expectedArguments(_, let arguments) {
+    print("swift-power-assert: error: available actions are: \(arguments.joined(separator: ", "))")
+} catch CommandError.writeFailed {
+    print("swift-power-assert: error: write failed")
+} catch CommandError.fileExists {
+    print("swift-power-assert: error: file exists")
+} catch CommandError.argumentError(let message) {
+    print("swift-power-assert: error: \(message)")
+} catch CommandError.noUnitTestBundle {
+    print("swift-power-assert: error: no unit test bundle")
+} catch CommandError.buildFailed {
+    print("swift-power-assert: error: xcodebuild command failed")
+} catch CommandError.instrumentFailed {
+    print("swift-power-assert: error: an instrumentation failed")
+} catch CommandError.executionFailed {
+    print("swift-power-assert: error: running XCTest failed")
+}
+exit(1)
