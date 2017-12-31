@@ -28,7 +28,7 @@ struct Transformer {
         self.sdkRoot = sdkRoot
     }
 
-    func transform(sourceFile: URL, dependencies: [URL], buildDirectory: String) throws -> String {
+    func transform(sourceFile: URL, dependencies: [URL], buildDirectory: String, verbose: Bool = false) throws -> String {
         let arguments = buildArguments(source: sourceFile, dependencies: dependencies, buildDirectory: buildDirectory)
         let rawAST = try dumpAST(arguments: arguments)
         let tokens = tokenize(rawAST: rawAST)
@@ -36,7 +36,7 @@ struct Transformer {
         let root = parse(node: node)
 
         let sourceText = try String(contentsOf: sourceFile)
-        let transformed = instrument(source: sourceText, root: root)
+        let transformed = instrument(source: sourceText, root: root, verbose: verbose)
 
         return transformed
     }
@@ -96,8 +96,8 @@ struct Transformer {
         return parser.parse(root: node)
     }
 
-    private func instrument(source: String, root: AST) -> String {
-        let instrumentor = Instrumentor(source: source)
+    private func instrument(source: String, root: AST, verbose: Bool = false) -> String {
+        let instrumentor = Instrumentor(source: source, verbose: verbose)
         return instrumentor.instrument(node: root)
     }
 }

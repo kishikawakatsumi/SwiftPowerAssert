@@ -21,8 +21,9 @@ import Foundation
 class Instrumentor {
     let source: String
     let sourceIndices: [Int: Int]
+    let verbose: Bool
 
-    init(source: String) {
+    init(source: String, verbose: Bool = false) {
         self.source = source
         var sourceIndices = [Int: Int]()
         var index = 0
@@ -34,10 +35,11 @@ class Instrumentor {
             characterCount += count + 1
         }
         self.sourceIndices = sourceIndices
+        self.verbose = verbose
     }
 
     func instrument(node: AST) -> String {
-        var instruments = [(SourceRange, String)]()
+        var expressions = [Expression]()
 
         node.declarations.forEach {
             switch $0 {
@@ -46,13 +48,22 @@ class Instrumentor {
                     switch $0 {
                     case .declaration(let declaration):
                         switch declaration {
-                        case .function(let declaration):
+                        case .function(let declaration) where declaration.name.hasPrefix("test"):
                             declaration.body.forEach {
                                 switch $0 {
                                 case .expression(let expression):
-                                    let source = instrument(functionCall: expression)
-                                    instruments.append((expression.range, source))
-                                case .declaration(_):
+                                    traverse(expression) {
+                                        if $0.rawValue == "call_expr", !$0.expressions.isEmpty, let decl = $0.expressions[0].decl {
+                                            switch decl {
+                                            case "Swift.(file).assert(_:_:file:line:)",
+                                                 "XCTest.(file).XCTAssertEqual(_:_:_:file:line:)":
+                                                expressions.append($0)
+                                            default:
+                                                break
+                                            }
+                                        }
+                                    }
+                                default:
                                     break
                                 }
                             }
@@ -64,6 +75,12 @@ class Instrumentor {
             default:
                 break
             }
+        }
+
+        var instruments = [(SourceRange, String)]()
+        for expression in expressions {
+            let source = instrument(functionCall: expression)
+            instruments.append((expression.range!, source))
         }
 
         var instrumented = source
@@ -93,20 +110,18 @@ class Instrumentor {
     }
 
     private func instrument(functionCall expression: Expression) -> String {
-        if expression.rawValue == "call_expr" {
-            if !expression.expressions.isEmpty, let decl = expression.expressions[0].decl {
-                switch decl {
-                case "Swift.(file).assert(_:_:file:line:)":
+        if !expression.expressions.isEmpty, let decl = expression.expressions[0].decl {
+            switch decl {
+            case "Swift.(file).assert(_:_:file:line:)":
+                let values = recordValues(expression)
+                return instrument(expression: expression, with: values)
+            case "XCTest.(file).XCTAssertEqual(_:_:_:file:line:)":
+                if let tupleExpression = findFirst(expression, where: { $0.rawValue == "tuple_expr" }) {
                     let values = recordValues(expression)
-                    return instrument(expression: expression, with: values)
-                case "XCTest.(file).XCTAssertEqual(_:_:_:file:line:)":
-                    if let tupleExpression = findFirst(expression, where: { $0.rawValue == "tuple_expr" }) {
-                        let values = recordValues(expression)
-                        return instrument(XCTAssertEqual: expression, tupleExpression: tupleExpression, values: values)
-                    }
-                default:
-                    break
+                    return instrument(XCTAssertEqual: expression, tupleExpression: tupleExpression, values: values)
                 }
+            default:
+                break
             }
         }
         return expression.source
@@ -115,17 +130,19 @@ class Instrumentor {
     private func recordValues(_ expression: Expression) -> [Int: String] {
         var values = [Int: String]()
         let formatter = Formatter()
-        
+
         traverse(expression) { (childExpression) in
-            guard childExpression.source != expression.source && (childExpression.range.start.line != expression.range.start.line || childExpression.range.start.column != expression.range.start.column) else {
-                return
+            guard let source = childExpression.source,
+                source != expression.source &&
+                (childExpression.range.start.line != expression.range.start.line || childExpression.range.start.column != expression.range.start.column) else {
+                    return
             }
 
             if (childExpression.rawValue == "declref_expr" && !childExpression.type.contains("->")) ||
                 childExpression.rawValue == "magic_identifier_literal_expr" {
                 let source = completeExpressionSource(childExpression, expression)
                 let tokens = formatter.tokenize(source: expression.source)
-                
+
                 let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
                 values[column] = formatter.format(tokens: formatter.tokenize(source: source))
             }
@@ -146,7 +163,7 @@ class Instrumentor {
                 let tokens = formatter.tokenize(source: expression.source)
 
                 let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
-                values[column] = formatter.format(tokens: formatter.tokenize(source: source)) + " as \(childExpression.type)"
+                values[column] = formatter.format(tokens: formatter.tokenize(source: source)) + " as \(childExpression.type!)"
             }
             if childExpression.rawValue == "string_literal_expr" {
                 let source = stringLiteralExpression(childExpression, expression)
@@ -157,14 +174,14 @@ class Instrumentor {
             }
             if childExpression.rawValue == "array_expr" || childExpression.rawValue == "dictionary_expr" ||
                 childExpression.rawValue == "object_literal" {
-                let source = childExpression.source
+                let source: String = childExpression.source
                 let tokens = formatter.tokenize(source: expression.source)
 
                 let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
-                values[column] = formatter.format(tokens: formatter.tokenize(source: source)) + " as \(childExpression.type)"
+                values[column] = formatter.format(tokens: formatter.tokenize(source: source)) + " as \(childExpression.type!)"
             }
             if childExpression.rawValue == "subscript_expr" || childExpression.rawValue == "keypath_application_expr" {
-                let source = childExpression.source
+                let source: String = childExpression.source
                 let tokens = formatter.tokenize(source: expression.source)
 
                 let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
@@ -179,7 +196,7 @@ class Instrumentor {
                 if !childExpression.expressions.isEmpty && childExpression.throwsModifier == "throws" {
                     values[column] = "try! " + formatter.format(tokens: formatter.tokenize(source: source))
                 } else if childExpression.argumentLabels == "nilLiteral:" {
-                    values[column] = formatter.format(tokens: formatter.tokenize(source: source)) + " as \(childExpression.type)"
+                    values[column] = formatter.format(tokens: formatter.tokenize(source: source)) + " as \(childExpression.type!)"
                 } else {
                     values[column] = formatter.format(tokens: formatter.tokenize(source: source))
                 }
@@ -217,7 +234,7 @@ class Instrumentor {
         return code
     }
 
-    func instrument(XCTAssertEqual expression: Expression, tupleExpression: Expression, values: [Int: String]) -> String {
+    private func instrument(XCTAssertEqual expression: Expression, tupleExpression: Expression, values: [Int: String]) -> String {
         let formatter = Formatter()
         let recordValues = recordValuesCodeFragment(values: values)
         let condition = "__Util.condition(\(formatter.format(tokens: formatter.tokenize(source: tupleExpression.source))))"
@@ -225,7 +242,7 @@ class Instrumentor {
         return instrument(expression: expression, recordValues: recordValues, condition: condition, assertion: assertion)
     }
 
-    func instrument(expression: Expression, with values: [Int: String]) -> String {
+    private func instrument(expression: Expression, with values: [Int: String]) -> String {
         let formatter = Formatter()
         let recordValues = recordValuesCodeFragment(values: values)
         let condition = formatter.format(tokens: formatter.tokenize(source: expression.expressions[1].source))
@@ -233,7 +250,7 @@ class Instrumentor {
         return instrument(expression: expression, recordValues: recordValues, condition: condition, assertion: assertion)
     }
 
-    func instrument(expression: Expression, recordValues: String, condition: String, assertion: String) -> String {
+    private func instrument(expression: Expression, recordValues: String, condition: String, assertion: String) -> String {
         return """
 
         do {
@@ -311,7 +328,7 @@ class Instrumentor {
                 \(recordValues)
                 return \(condition)
             }()
-            if !condition {
+            if \(verbose) || !condition {
                 func align(current: inout Int, column: Int, string: String) {
                     while current < column - 1 {
                         print(\" \", terminator: \"\")
@@ -348,7 +365,7 @@ class Instrumentor {
     }
 
     private func stringLiteralExpression(_ child: Expression, _ parent: Expression) -> String {
-        var source = child.source
+        var source: String = child.source
         let rest = restOfExpression(child, parent)
         var previous = ""
         for character in rest {
@@ -384,7 +401,7 @@ class Instrumentor {
     }
 
     private func completeExpressionSource(_ child: Expression, _ parent: Expression) -> String {
-        let source = child.source
+        let source: String = child.source
         let rest = restOfExpression(child, parent)
         return extendExpression(rest, source)
     }

@@ -21,7 +21,7 @@ import Basic
 import SwiftPowerAssertCore
 
 struct TestCommand {
-    func run(xcarguments: [String]) throws {
+    func run(xcarguments: [String], verbose: Bool = false) throws {
         var iterator = xcarguments.enumerated().makeIterator()
         var buildActions = [(Int, String)]()
         var testOnlyOptions = [(Int, String)]()
@@ -93,7 +93,7 @@ struct TestCommand {
                                            dependencies: dependencies, buildDirectory: buildDirectory)
                 let processor = SwiftPowerAssert(buildOptions: options)
                 do {
-                    let transformed = try processor.processFile(input: source)
+                    let transformed = try processor.processFile(input: source, verbose: verbose)
                     if let first = sources.first, first == source {
                         try (transformed + "\n\n\n" + __DisplayWidth.myself).write(to: source, atomically: true, encoding: .utf8)
                     } else {
