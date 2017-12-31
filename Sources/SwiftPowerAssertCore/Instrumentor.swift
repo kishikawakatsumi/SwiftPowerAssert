@@ -331,7 +331,7 @@ class Instrumentor {
                     var current = 0
                     var index = 0
                     while index < values.count {
-                        if index == values.count - 1 || values[index].0 + values[index].1.count < values[index + 1].0 {
+                        if index == values.count - 1 || ((values[index].0 + values[index].1.count < values[index + 1].0) && values[index].1.unicodeScalars.filter({ !$0.isASCII }).isEmpty) {
                             align(current: &current, column: values[index].0, string: values[index].1)
                             values.remove(at: index)
                         } else {

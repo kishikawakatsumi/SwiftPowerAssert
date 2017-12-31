@@ -44,7 +44,7 @@ var generatedCode = """
     import Foundation
 
     public class __DisplayWidth {
-        static func of(_ s: String, inEastAsian: Bool = false) -> Int {
+        public static func of(_ s: String, inEastAsian: Bool = false) -> Int {
             return s.unicodeScalars.reduce(0) { $0 + of($1, inEastAsian: inEastAsian) }
         }
 
@@ -60,7 +60,7 @@ var generatedCode = """
 generatedCode = """
     \(generatedCode)
     extension __DisplayWidth {
-        static var myself: String {
+        public static var myself: String {
             let myself = \"\"\"
     \(generatedCode.split(separator: "\n").map { String(repeating: " ", count: 4 * 3) + $0 }.joined(separator: "\n"))
                 \"\"\"
