@@ -35,6 +35,7 @@ do {
     let parser = ArgumentParser(commandName: "swift-power-assert", usage: "SUBCOMMAND", overview: "SwiftPowerAssert, provide diagrammed assertions in Swift")
 
     let test = parser.add(subparser: "test", overview: "Run XCTest with power assertion enabled.")
+    let verbose = test.add(option: "--verbose", kind: Bool.self, usage: "Show more debugging information")
     let xcargs = test.add(option: "--xcargs", shortName: "-x", kind: [String].self, strategy: .remaining, usage: "swift-power-assert test --xcargs -workspace <workspacename> -scheme <schemeName> [<buildaction>]...")
 
     let arguments = Array(CommandLine.arguments.dropFirst())
@@ -44,7 +45,7 @@ do {
     case let subcommand? where subcommand == "test":
         if let xcodeArguments = result.get(xcargs) {
             let command = TestCommand()
-            try command.run(xcarguments: xcodeArguments)
+            try command.run(xcarguments: xcodeArguments, verbose: result.get(verbose) ?? false)
         } else {
             test.printUsage(on: stdoutStream)
         }

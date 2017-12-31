@@ -37,151 +37,14 @@ class Parser {
         for node in sourceFileNode.children {
             for token in node.value {
                 switch (token.type, token.value) {
-                case (.token, "import_decl"):
-                    declarations.append(.import(parseImportDeclarationNode(node: node)))
-                case (.token, "struct_decl"):
-                    declarations.append(.struct(parseStructDeclarationNode(node: node)))
-                case (.token, "enum_decl"):
-                    declarations.append(.enum(parseEnumDeclarationNode(node: node)))
                 case (.token, "class_decl"):
                     declarations.append(.class(parseClassDeclarationNode(node: node)))
-                case (.token, "func_decl"):
-                    declarations.append(.function(parseFunctionDeclarationNode(node: node)))
-                case (.token, "var_decl"):
-                    declarations.append(.variable(parseVariableDeclarationNode(node: node)))
                 default:
                     break
                 }
             }
         }
         return AST(declarations: declarations)
-    }
-
-    private func parseImportDeclarationNode(node: Node<[Token]>) -> ImportDeclaration {
-        var importKind: ImportKind? = nil
-        var importPath: String!
-
-        for token in node.value {
-            switch token.type {
-            case .symbol:
-                importPath = token.value
-            default:
-                break
-            }
-        }
-
-        let attributes = parseKeyValueAttributes(tokens: node.value)
-        if let kind = attributes["kind"] {
-            importKind = ImportKind(rawValue: kind)
-        }
-
-        return ImportDeclaration(importKind: importKind, importPath: importPath)
-    }
-
-    private func parseStructDeclarationNode(node: Node<[Token]>) -> StructDeclaration {
-        let tokens = node.value
-
-        var name: String!
-        for token in tokens {
-            switch token.type {
-            case .string:
-                name = token.value
-            default:
-                break
-            }
-        }
-
-        var accessLevel: AccessLevelModifier
-        let attributes = parseKeyValueAttributes(tokens: tokens)
-        if let access = attributes["access"] {
-            accessLevel = AccessLevelModifier(rawValue: access)!
-        } else {
-            accessLevel = .internal
-        }
-
-        let typeInheritance = parseInherits(tokens: tokens)
-
-        var members = [StructMember]()
-        for node in node.children {
-            let tokens = node.value
-            if isImplicit(tokens: tokens) {
-                continue
-            }
-            for token in tokens {
-                switch (token.type, token.value) {
-                case (.token, "var_decl"):
-                    members.append(.declaration(.variable(parseVariableDeclarationNode(node: node))))
-                case (.token, "func_decl"):
-                    members.append(.declaration(.function(parseFunctionDeclarationNode(node: node))))
-                default:
-                    break
-                }
-            }
-        }
-
-        return StructDeclaration(accessLevel: accessLevel, name: name, typeInheritance: typeInheritance, members: members)
-    }
-
-    private func parseEnumDeclarationNode(node: Node<[Token]>) -> EnumDeclaration {
-        let tokens = node.value
-
-        var name: String!
-        for token in tokens {
-            switch token.type {
-            case .string:
-                name = token.value
-            default:
-                break
-            }
-        }
-
-        let accessLevel: AccessLevelModifier
-        let attributes = parseKeyValueAttributes(tokens: tokens)
-        if let access = attributes["access"] {
-            accessLevel = AccessLevelModifier(rawValue: access)!
-        } else {
-            accessLevel = .internal
-        }
-
-        let typeInheritance = parseInherits(tokens: tokens)
-
-        var members = [EnumMember]()
-        var cases = [EnumCase]()
-        for node in node.children {
-            let tokens = node.value
-            for token in tokens {
-                if isImplicit(tokens: tokens) {
-                    continue
-                }
-                switch (token.type, token.value) {
-                case (.token, "enum_element_decl"):
-                    cases.append(parseEnumElementDeclarationNode(node: node))
-                case (.token, "var_decl"):
-                    members.append(.declaration(.variable(parseVariableDeclarationNode(node: node))))
-                case (.token, "func_decl"):
-                    members.append(.declaration(.function(parseFunctionDeclarationNode(node: node))))
-                default:
-                    break
-                }
-            }
-        }
-        
-        members.append(.case(EnumCaseClause(cases: cases)))
-
-        return EnumDeclaration(accessLevel: accessLevel, name: name, typeInheritance: typeInheritance, members: members)
-    }
-
-    private func parseEnumElementDeclarationNode(node: Node<[Token]>) -> EnumCase {
-        var name: String!
-        for token in node.value {
-            switch token.type {
-            case .string:
-                name = token.value
-            default:
-                break
-            }
-        }
-        return EnumCase(name: name)
     }
 
     private func parseClassDeclarationNode(node: Node<[Token]>) -> ClassDeclaration {
@@ -206,7 +69,6 @@ class Parser {
         }
 
         let typeInheritance = parseInherits(tokens: tokens)
-        let final = parseFinal(tokens: tokens)
 
         var members = [ClassMember]()
         for node in node.children {
@@ -216,8 +78,6 @@ class Parser {
             }
             for token in tokens {
                 switch (token.type, token.value) {
-                case (.token, "var_decl"):
-                    members.append(.declaration(.variable(parseVariableDeclarationNode(node: node))))
                 case (.token, "func_decl"):
                     members.append(.declaration(.function(parseFunctionDeclarationNode(node: node))))
                 default:
@@ -226,42 +86,7 @@ class Parser {
             }
         }
 
-        return ClassDeclaration(accessLevel: accessLevel, final: final, name: name, typeInheritance: typeInheritance, members: members)
-    }
-
-    private func parseVariableDeclarationNode(node: Node<[Token]>) -> VariableDeclaration {
-        let tokens = node.value
-
-        var name: String!
-        var isConstant = false
-        var modifiers = [DeclarationModifier]()
-
-        for token in tokens {
-            switch token.type {
-            case .token where token.value == "let":
-                isConstant = true
-            case .token where token.value == "@objc":
-                modifiers.append(.objc)
-            case .token where token.value == "dynamic":
-                modifiers.append(.dynamic)
-            case .string:
-                name = token.value
-            default:
-                break
-            }
-        }
-
-        let accessLevel: AccessLevelModifier
-        let attributes = parseKeyValueAttributes(tokens: tokens)
-        if let access = attributes["access"] {
-            accessLevel = AccessLevelModifier(rawValue: access)!
-        } else {
-            accessLevel = .internal
-        }
-
-        let type = attributes["type"]!
-
-        return VariableDeclaration(accessLevel: accessLevel, modifiers: modifiers, name: name, type: type, isConstant: isConstant)
+        return ClassDeclaration(accessLevel: accessLevel, name: name, typeInheritance: typeInheritance, members: members)
     }
 
     private func parseFunctionDeclarationNode(node: Node<[Token]>) -> FunctionDeclaration {
@@ -271,12 +96,12 @@ class Parser {
         var modifiers = [DeclarationModifier]()
 
         for token in tokens {
-            switch token.type {
-            case .string:
+            switch (token.type, token.value) {
+            case (.string, _):
                 name = token.value
-            case .token where token.value == "@objc":
+            case (.token, "@objc"):
                 modifiers.append(.objc)
-            case .token where token.value == "dynamic":
+            case (.token, "dynamic"):
                 modifiers.append(.dynamic)
             default:
                 break
@@ -294,7 +119,7 @@ class Parser {
                 case (.token, "result"):
                     result = parseResultNode(node: node)
                 case (.token, "brace_stmt"):
-                    body.append(contentsOf: parseStatementNode(node: node))
+                    body.append(.expression(parseExpressionNode(node: node)))
                 default:
                     break
                 }
@@ -314,57 +139,50 @@ class Parser {
         return FunctionDeclaration(accessLevel: accessLevel, modifiers: modifiers, name: name, parameters: parameters, throwBehavior: throwBehavior, result: result, body: body)
     }
 
-    private func parseStatementNode(node: Node<[Token]>) -> [Statement] {
-        var statements = [Statement]()
-        for node in node.children {
-            for token in node.value {
-                switch (token.type, token.value) {
-                case (.token, "var_decl"):
-                    statements.append(.declaration(.variable(parseVariableDeclarationNode(node: node))))
-                case (.token, "call_expr"):
-                    statements.append(.expression(parseExpressionNode(node: node)))
-                case (.token, let value) where value.hasSuffix("_stmt"):
-                    statements.append(contentsOf: parseStatementNode(node: node))
-                default:
-                    break
-                }
-            }
-        }
-        return statements
-    }
-
     private func parseExpressionNode(node: Node<[Token]>) -> Expression {
         let tokens = node.value
         let attributes = parseKeyValueAttributes(tokens: tokens)
 
-        let rawLocation = attributes["location"]!
-        let location = parseLocation(rawLocation)
-        let rawRange = attributes["range"]!
-        let source = parseRange(rawRange)
+        let rawValue = tokens[1].value
+        let type = attributes["type"]
+        let rawLocation = attributes["location"]
+        var location: SourceLocation?
+        if let rawLocation = rawLocation {
+            location = parseLocation(rawLocation)
+        }
+        let rawRange = attributes["range"]
+        var sourceRange: SourceRange?
+        var source: String?
+        if let rawRange = rawRange {
+            let (s, r) = parseRange(rawRange)
+            sourceRange = r
+            source = s
+        }
+        let decl = attributes["decl"]
+        let value = attributes["value"]
         let argumentLabels = attributes["arg_labels"]
         var throwsModifier: String?
         for token in tokens {
-            switch token.type {
-            case .token where token.value == "nothrow":
+            switch (token.type, token.value) {
+            case (.token, "nothrow"):
                 throwsModifier = "nothrow"
-            case .token where token.value == "throws":
+            case (.token, "throws"):
                 throwsModifier = "throws"
-            case .token where token.value == "rethrows":
+            case (.token, "rethrows"):
                 throwsModifier = "rethrows"
             default:
                 break
             }
         }
-        var expression = Expression(rawValue: tokens[1].value, type: attributes["type"]!, rawLocation: rawLocation, rawRange: rawRange, location: location, range: source.1, source: source.0, decl: attributes["decl"], value: attributes["value"], throwsModifier: throwsModifier, argumentLabels: argumentLabels, isImplicit: isImplicit(tokens: tokens), expressions: [])
+        var expression = Expression(rawValue: rawValue, type: type, rawLocation: rawLocation, rawRange: rawRange,
+                                    location: location, range: sourceRange, source: source,
+                                    decl: decl, value: value, throwsModifier: throwsModifier,
+                                    argumentLabels: argumentLabels, expressions: [])
 
         for node in node.children {
-            for token in node.value {
-                switch token.type {
-                case .token where token.value == "location":
-                    expression.expressions.append(parseExpressionNode(node: node))
-                default:
-                    break
-                }
+            let tokens = node.value
+            if tokens.count > 1 {
+                expression.expressions.append(parseExpressionNode(node: node))
             }
         }
         return expression
@@ -451,18 +269,6 @@ class Parser {
                 if case .token = tokens[index - 1].type, tokens[index - 1].value == "inherits" {
                     return tokens[index + 1].value
                 }
-            default:
-                break
-            }
-        }
-        return nil
-    }
-
-    private func parseFinal(tokens: [Token]) -> Final? {
-        for token in tokens {
-            switch (token.type, token.value) {
-            case (.token, "final"):
-                return .final
             default:
                 break
             }

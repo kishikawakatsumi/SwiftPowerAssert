@@ -30,8 +30,8 @@ public final class SwiftPowerAssert {
         self.buildOptions = buildOptions
     }
 
-    public func processFile(input: URL) throws -> String {
+    public func processFile(input: URL, verbose: Bool = false) throws -> String {
         let transformer = Transformer(target: buildOptions.targetTriple, sdkRoot: buildOptions.sdkRoot)
-        return try transformer.transform(sourceFile: input, dependencies: buildOptions.dependencies, buildDirectory: buildOptions.buildDirectory)
+        return try transformer.transform(sourceFile: input, dependencies: buildOptions.dependencies, buildDirectory: buildOptions.buildDirectory, verbose: verbose)
     }
 }
