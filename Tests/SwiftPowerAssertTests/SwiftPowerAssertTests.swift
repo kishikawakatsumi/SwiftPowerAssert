@@ -1141,9 +1141,10 @@ class SwiftPowerAssertTests: XCTestCase {
                    ["hello", "hola", "bonjour", "안녕"]
             assert(greetings[keyPath: \\[String].first?.count] == 4)
                    |                                   |    | |  |
-                   ["hello", "hola", "bonjour", "안녕"]|    5 |  4
-                                                       |      false
-                                                       Swift.KeyPath<Swift.Array<Swift.String>, Swift.Optional<Swift.Int>>
+                   |                                   |    5 |  4
+                   |                                   |      false
+                   |                                   Swift.KeyPath<Swift.Array<Swift.String>, Swift.Optional<Swift.Int>>
+                   ["hello", "hola", "bonjour", "안녕"]
             assert(interestingNumbers[keyPath: \\[String: [Int]].["prime"]]! == [1, 2, 3])
                    |                                                    ||  |  ||  |  |
                    |                                                    ||  |  |1  2  3
@@ -1347,7 +1348,17 @@ class SwiftPowerAssertTests: XCTestCase {
                     let dc = DateComponents(calendar: Calendar(identifier: .gregorian), timeZone: TimeZone(abbreviation: "JST")!, year: 1980, month: 10, day: 28)
                     let date = dc.date!
 
-                    let tuple = (name: "岸川克己", age: 37, birthday: date)
+                    let kanjiName = "岸川克己"
+                    let emojiName = "😇岸川克己🇯🇵"
+
+                    let tuple = (name: kanjiName, age: 37, birthday: date)
+
+                    assert(tuple != (name: kanjiName, age: 37, birthday: date))
+                    assert(tuple != (kanjiName, 37, date))
+                    assert(tuple.name != (kanjiName, 37, date).0 || tuple.age != (kanjiName, 37, date).1)
+
+                    assert(tuple.name == (emojiName, 37, date).0 || tuple.age != (kanjiName, 37, date).1)
+                    assert(tuple.name != (kanjiName, 37, date).0 || tuple.age != (emojiName, 37, date).1)
 
                     assert(tuple != (name: "岸川克己", age: 37, birthday: date))
                     assert(tuple != ("岸川克己", 37, date))
@@ -1361,41 +1372,111 @@ class SwiftPowerAssertTests: XCTestCase {
             """
 
         let expected = """
+            assert(tuple != (name: kanjiName, age: 37, birthday: date))
+                   |     |         |               |             |
+                   |     false     |               37            1980-10-27 15:00:00 +0000
+                   |               "岸川克己"
+                   (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
+            assert(tuple != (kanjiName, 37, date))
+                   |     |   |          |   |
+                   |     |   |          37  1980-10-27 15:00:00 +0000
+                   |     |   "岸川克己"
+                   |     false
+                   (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
+            assert(tuple.name != (kanjiName, 37, date).0 || tuple.age != (kanjiName, 37, date).1)
+                   |     |    |   |          |   |     | |  |     |   |   |          |   |     |
+                   |     |    |   |          37  |     | |  |     37  |   |          37  |     37
+                   |     |    |   |              |     | |  |         |   |              1980-10-27 15:00:00 +0000
+                   |     |    |   |              |     | |  |         |   "岸川克己"
+                   |     |    |   |              |     | |  |         false
+                   |     |    |   |              |     | |  (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
+                   |     |    |   |              |     | false
+                   |     |    |   |              |     "岸川克己"
+                   |     |    |   |              1980-10-27 15:00:00 +0000
+                   |     |    |   "岸川克己"
+                   |     |    false
+                   |     "岸川克己"
+                   (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
+            assert(tuple.name == (emojiName, 37, date).0 || tuple.age != (kanjiName, 37, date).1)
+                   |     |    |   |          |   |     | |  |     |   |   |          |   |     |
+                   |     |    |   |          37  |     | |  |     37  |   |          37  |     37
+                   |     |    |   |              |     | |  |         |   |              1980-10-27 15:00:00 +0000
+                   |     |    |   |              |     | |  |         |   "岸川克己"
+                   |     |    |   |              |     | |  |         false
+                   |     |    |   |              |     | |  (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
+                   |     |    |   |              |     | false
+                   |     |    |   |              |     "😇岸川克己🇯🇵"
+                   |     |    |   |              1980-10-27 15:00:00 +0000
+                   |     |    |   "😇岸川克己🇯🇵"
+                   |     |    false
+                   |     "岸川克己"
+                   (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
+            assert(tuple.name != (kanjiName, 37, date).0 || tuple.age != (emojiName, 37, date).1)
+                   |     |    |   |          |   |     | |  |     |   |   |          |   |     |
+                   |     |    |   |          37  |     | |  |     37  |   |          37  |     37
+                   |     |    |   |              |     | |  |         |   |              1980-10-27 15:00:00 +0000
+                   |     |    |   |              |     | |  |         |   "😇岸川克己🇯🇵"
+                   |     |    |   |              |     | |  |         false
+                   |     |    |   |              |     | |  (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
+                   |     |    |   |              |     | false
+                   |     |    |   |              |     "岸川克己"
+                   |     |    |   |              1980-10-27 15:00:00 +0000
+                   |     |    |   "岸川克己"
+                   |     |    false
+                   |     "岸川克己"
+                   (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
             assert(tuple != (name: "岸川克己", age: 37, birthday: date))
                    |     |         |                |             |
-                   |     false     "岸川克己"       37            1980-10-27 15:00:00 +0000
+                   |     false     |                37            1980-10-27 15:00:00 +0000
+                   |               "岸川克己"
                    (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
             assert(tuple != ("岸川克己", 37, date))
                    |     |   |           |   |
-                   |     |   "岸川克己"  37  1980-10-27 15:00:00 +0000
+                   |     |   |           37  1980-10-27 15:00:00 +0000
+                   |     |   "岸川克己"
                    |     false
                    (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
             assert(tuple.name != ("岸川克己", 37, date).0 || tuple.age != ("岸川克己", 37, date).1)
                    |     |    |   |           |   |     | |  |     |   |   |           |   |     |
-                   |     |    |   "岸川克己"  37  |     | |  |     37  |   "岸川克己"  37  |     37
-                   |     |    false               |     | |  |         false               1980-10-27 15:00:00 +0000
-                   |     "岸川克己"               |     | |  (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
-                   |                              |     | false
-                   |                              |     "岸川克己"
-                   |                              1980-10-27 15:00:00 +0000
+                   |     |    |   |           37  |     | |  |     37  |   |           37  |     37
+                   |     |    |   |               |     | |  |         |   |               1980-10-27 15:00:00 +0000
+                   |     |    |   |               |     | |  |         |   "岸川克己"
+                   |     |    |   |               |     | |  |         false
+                   |     |    |   |               |     | |  (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
+                   |     |    |   |               |     | false
+                   |     |    |   |               |     "岸川克己"
+                   |     |    |   |               1980-10-27 15:00:00 +0000
+                   |     |    |   "岸川克己"
+                   |     |    false
+                   |     "岸川克己"
                    (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
             assert(tuple.name == ("😇岸川克己🇯🇵", 37, date).0 || tuple.age != ("岸川克己", 37, date).1)
                    |     |    |   |               |   |     | |  |     |   |   |           |   |     |
-                   |     |    |   "😇岸川克己🇯🇵"  37  |     | |  |     37  |   "岸川克己"  37  |     37
-                   |     |    false                   |     | |  |         false               1980-10-27 15:00:00 +0000
-                   |     "岸川克己"                   |     | |  (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
-                   |                                  |     | false
-                   |                                  |     "😇岸川克己🇯🇵"
-                   |                                  1980-10-27 15:00:00 +0000
+                   |     |    |   |               37  |     | |  |     37  |   |           37  |     37
+                   |     |    |   |                   |     | |  |         |   |               1980-10-27 15:00:00 +0000
+                   |     |    |   |                   |     | |  |         |   "岸川克己"
+                   |     |    |   |                   |     | |  |         false
+                   |     |    |   |                   |     | |  (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
+                   |     |    |   |                   |     | false
+                   |     |    |   |                   |     "😇岸川克己🇯🇵"
+                   |     |    |   |                   1980-10-27 15:00:00 +0000
+                   |     |    |   "😇岸川克己🇯🇵"
+                   |     |    false
+                   |     "岸川克己"
                    (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
             assert(tuple.name != ("岸川克己", 37, date).0 || tuple.age != ("😇岸川克己🇯🇵", 37, date).1)
                    |     |    |   |           |   |     | |  |     |   |   |               |   |     |
-                   |     |    |   "岸川克己"  37  |     | |  |     37  |   "😇岸川克己🇯🇵"  37  |     37
-                   |     |    false               |     | |  |         false                   1980-10-27 15:00:00 +0000
-                   |     "岸川克己"               |     | |  (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
-                   |                              |     | false
-                   |                              |     "岸川克己"
-                   |                              1980-10-27 15:00:00 +0000
+                   |     |    |   |           37  |     | |  |     37  |   |               37  |     37
+                   |     |    |   |               |     | |  |         |   |                   1980-10-27 15:00:00 +0000
+                   |     |    |   |               |     | |  |         |   "😇岸川克己🇯🇵"
+                   |     |    |   |               |     | |  |         false
+                   |     |    |   |               |     | |  (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
+                   |     |    |   |               |     | false
+                   |     |    |   |               |     "岸川克己"
+                   |     |    |   |               1980-10-27 15:00:00 +0000
+                   |     |    |   "岸川克己"
+                   |     |    false
+                   |     "岸川克己"
                    (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
 
             """
@@ -1404,7 +1485,6 @@ class SwiftPowerAssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    #if DEBUG
     func testDisplayWidth() throws {
         XCTAssertEqual(__DisplayWidth.of("Katsumi Kishikawa", inEastAsian: true), 17)
         XCTAssertEqual(__DisplayWidth.of("岸川克己", inEastAsian: true), 8)
@@ -1414,5 +1494,4 @@ class SwiftPowerAssertTests: XCTestCase {
         XCTAssertEqual(__DisplayWidth.of("😇岸川克己🇯🇵", inEastAsian: true), 12)
         XCTAssertEqual(__DisplayWidth.of("😇岸川 克己🇯🇵", inEastAsian: true), 13)
     }
-    #endif
 }
