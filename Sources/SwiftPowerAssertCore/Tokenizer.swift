@@ -24,6 +24,7 @@ class Tokenizer {
             case plain
             case token
             case value
+            case path
             case array
             case symbol
             case string
@@ -84,7 +85,11 @@ class Tokenizer {
                 case "=":
                     state.tokens.append(Token(type: .token, value: state.storage))
                     state.tokens.append(Token(type: .token, value: String(character)))
-                    state.mode = .value
+                    if state.storage == "location" {
+                        state.mode = .path
+                    } else {
+                        state.mode = .value
+                    }
                     state.storage = ""
                 case "(", ")", ":":
                     state.tokens.append(Token(type: .token, value: state.storage))
@@ -102,6 +107,29 @@ class Tokenizer {
                     state.tokens.append(Token(type: .token, value: state.storage))
                     state.mode = .plain
                     state.storage = ""
+                case "'":
+                    state.mode = .symbol
+                case "\"":
+                    state.mode = .string
+                case "\n":
+                    state.tokens.append(Token(type: .token, value: state.storage))
+                    state.mode = .newline
+                    state.storage = ""
+                default:
+                    state.storage += String(character)
+                }
+            case .path:
+                switch character {
+                case "[":
+                    state.mode = .array
+                case " ":
+                    if state.storage.contains(":") {
+                        state.tokens.append(Token(type: .token, value: state.storage))
+                        state.mode = .plain
+                        state.storage = ""
+                    } else {
+                        state.storage += String(character)
+                    }
                 case "'":
                     state.mode = .symbol
                 case "\"":

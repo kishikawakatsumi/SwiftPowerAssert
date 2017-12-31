@@ -38,16 +38,13 @@ data.enumerateLines { (line, stop) in
 
 var generatedCode = """
     //===----------------------------------------------------------------------===//
-    // Automatically Generated From Tools/UnicodeDisplayWidth.swift
-    // Do Not Edit Directly!
+    // Automatically Generated From Tools/GenerateUtilities.swift
     //===----------------------------------------------------------------------===//
-
-    // RUN: Tools/UnicodeDisplayWidth.swift
 
     import Foundation
 
-    public class DisplayWidth {
-        public static func of(_ s: String, inEastAsian: Bool = false) -> Int {
+    public class __DisplayWidth {
+        static func of(_ s: String, inEastAsian: Bool = false) -> Int {
             return s.unicodeScalars.reduce(0) { $0 + of($1, inEastAsian: inEastAsian) }
         }
 
@@ -62,8 +59,8 @@ var generatedCode = """
 
 generatedCode = """
     \(generatedCode)
-    public extension DisplayWidth {
-        public static var myself: String {
+    extension __DisplayWidth {
+        static var myself: String {
             let myself = \"\"\"
     \(generatedCode.split(separator: "\n").map { String(repeating: " ", count: 4 * 3) + $0 }.joined(separator: "\n"))
                 \"\"\"
@@ -73,4 +70,4 @@ generatedCode = """
 
     """
 
-try! generatedCode.write(to: URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent().appendingPathComponent("../Sources/SwiftPowerAssertCore/DisplayWidth.swift"), atomically: true, encoding: .utf8)
+try! generatedCode.write(to: URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent().appendingPathComponent("../Sources/SwiftPowerAssertCore/Utilities.swift"), atomically: true, encoding: .utf8)

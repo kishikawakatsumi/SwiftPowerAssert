@@ -20,71 +20,106 @@ import XCTest
 import Basic
 import SwiftPowerAssertCore
 
-struct TestRunner {
-    func run(source: String, options: Options = Options(), identifier: String = #function) throws -> String {
-        let temporaryDirectory = try TemporaryDirectory(prefix: "com.kishikawakatsumi.swift-power-assert", removeTreeOnDeinit: true)
-        let temporaryFile = try TemporaryFile(dir: temporaryDirectory.path, prefix: "test", suffix: ".swift")
+private class TestRunner {
+    private lazy var temporaryDirectory = {
+        return try! TemporaryDirectory(prefix: "com.kishikawakatsumi.swift-power-assert", removeTreeOnDeinit: true)
+    }()
+    private lazy var temporaryFile = {
+        return try! TemporaryFile(dir: temporaryDirectory.path, suffix: ".swift").path
+    }()
+    private lazy var sourceFilePath = {
+        return temporaryFile.asString
+    }()
+    private lazy var utilitiesFilePath = {
+        return temporaryDirectory.path.appending(component: "Utilities.swift").asString
+    }()
+    private lazy var mainFilePath = {
+        return temporaryDirectory.path.appending(component: "main.swift").asString
+    }()
+    private lazy var executablePath = {
+        return sourceFilePath + ".o"
+    }()
+    private lazy var options: BuildOptions = {
+        let sdk = SDK.macosx
+        let sdkPath = sdk.path()
+        let sdkVersion = sdk.version()
+        return BuildOptions(sdkName: sdk.name + sdkVersion, sdkRoot: sdkPath,
+                            platformName: sdk.name, platformTargetPrefix: sdk.os,
+                            arch: "x86_64", deploymentTarget: sdkVersion,
+                            dependencies: [], buildDirectory: temporaryDirectory.path.asString)
+    }()
 
-        let sourceFilePath = temporaryFile.path.asString
-        let executablePath = sourceFilePath + ".o"
+    func run(source: String) -> String {
+        prepare(source: source)
+        compile()
 
-        try source.write(toFile: sourceFilePath, atomically: true, encoding: .utf8)
+        let result = execute()
+        print(result)
 
-        var options = options
-        options.testable = true
+        return result
+    }
 
-        let runner = SwiftPowerAssert(sources: sourceFilePath, output: temporaryDirectory.path.asString, options: options)
-        try runner.run()
+    private func prepare(source: String) {
+        try! source.write(toFile: sourceFilePath, atomically: true, encoding: .utf8)
+        let processor = SwiftPowerAssert(buildOptions: options)
+        do {
+            let transformed = try processor.processFile(input: URL(fileURLWithPath: sourceFilePath))
+            try! transformed.write(toFile: sourceFilePath, atomically: true, encoding: .utf8)
+        } catch {
+            fatalError("failed to instrument assertions")
+        }
 
-        let sdk = options.sdk
-        let sdkPath = sdk.path
-        let target = "\(options.arch)-apple-\(options.sdk)\(options.deploymentTarget)"
+        try! __DisplayWidth.myself.write(toFile: utilitiesFilePath, atomically: true, encoding: .utf8)
+        let main = """
+            Tests().testMethod()
 
+            """
+        try! main.write(toFile: mainFilePath, atomically: true, encoding: .utf8)
+    }
+
+    private func compile() {
         let arguments = [
             "/usr/bin/xcrun",
             "swiftc",
             "-O",
             "-whole-module-optimization",
             sourceFilePath,
+            utilitiesFilePath,
+            mainFilePath,
             "-o",
             executablePath,
             "-target",
-            target,
+            options.targetTriple,
             "-sdk",
-            sdkPath,
+            options.sdkRoot,
             "-F",
-            "\(sdkPath)/../../../Developer/Library/Frameworks",
+            "\(options.sdkRoot)/../../../Developer/Library/Frameworks",
             "-Xlinker",
             "-rpath",
             "-Xlinker",
-            "\(sdkPath)/../../../Developer/Library/Frameworks",
+            "\(options.sdkRoot)/../../../Developer/Library/Frameworks",
         ]
 
-        let compile = Process(arguments: arguments)
-        try compile.launch()
-        let compileResult = try compile.waitUntilExit()
-        switch compileResult.exitStatus {
-        case .terminated(_):
-            break
-        case .signalled(_):
-            break
+        let process = Process(arguments: arguments)
+        try! process.launch()
+        let result = try! process.waitUntilExit()
+        if case .terminated(let code) = result.exitStatus, code != 0 {
+            print(try! result.utf8stderrOutput())
+            fatalError("failed to compile an instrumented file")
+        }
+    }
+
+    private func execute() -> String {
+        let process = Process(arguments: [executablePath])
+        try! process.launch()
+
+        let result = try! process.waitUntilExit()
+        if case .terminated(let code) = result.exitStatus, code != 0 {
+            print(try! result.utf8stderrOutput())
+            fatalError("failed to run an instrumented code")
         }
 
-        let exec = Process(arguments: [executablePath])
-        try exec.launch()
-
-        let execResult = try exec.waitUntilExit()
-        switch execResult.exitStatus {
-        case .terminated(_):
-            break
-        case .signalled(_):
-            break
-        }
-
-        let result = try execResult.utf8Output()
-        print(result)
-
-        return result
+        return try! result.utf8Output()
     }
 }
 
@@ -109,7 +144,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -123,7 +157,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -147,7 +181,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -161,7 +194,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -181,7 +214,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -192,7 +224,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -212,7 +244,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -224,7 +255,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -255,7 +286,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -270,7 +300,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -290,7 +320,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -301,7 +330,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -323,7 +352,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -334,7 +362,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -365,7 +393,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -381,7 +408,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -412,7 +439,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -439,7 +465,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -478,7 +504,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -497,7 +522,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -524,7 +549,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -536,7 +560,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -581,7 +605,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -596,7 +619,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -622,7 +645,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -633,7 +655,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -660,7 +682,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -671,7 +692,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -704,7 +725,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -732,7 +752,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -748,7 +768,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -759,7 +778,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -776,7 +795,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -787,7 +805,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -806,7 +824,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -817,7 +834,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -836,7 +853,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -847,7 +863,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -863,13 +879,12 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
-
+        // FIXME: `#line` shouldn't be changed due to instrument code
         let expected = """
             assert(#file == "*.swift" && #line == 1 && #column == 2 && #function == "function")
                    |     |  |         |  |     |  | |  |       |  | |  |         |  |
-                   |     |  "*.swift" |  495   |  1 |  32      |  2 |  |         |  "function"
+                   |     |  "*.swift" |  81    |  1 |  34      |  2 |  |         |  "function"
                    |     false        false    |    false      |    |  |         false
                    |                           false           |    |  "testMethod()"
                    |                                           |    false
@@ -887,7 +902,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected.replacingOccurrences(of: "/.+\\.swift", with: "", options: .regularExpression),
                        result.replacingOccurrences(of: "/.+\\.swift", with: "", options: .regularExpression))
     }
@@ -916,7 +931,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -933,7 +947,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -951,7 +965,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -970,7 +983,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -993,7 +1006,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -1018,7 +1030,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -1077,7 +1089,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -1163,7 +1174,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -1179,7 +1190,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -1194,7 +1204,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -1208,7 +1218,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -1220,7 +1229,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -1238,7 +1247,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -1256,7 +1264,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -1290,7 +1298,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -1327,7 +1334,7 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
@@ -1351,7 +1358,6 @@ class SwiftPowerAssertTests: XCTestCase {
                 }
             }
 
-            Tests().testMethod()
             """
 
         let expected = """
@@ -1394,17 +1400,19 @@ class SwiftPowerAssertTests: XCTestCase {
 
             """
 
-        let result = try TestRunner().run(source: source)
+        let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
 
+    #if DEBUG
     func testDisplayWidth() throws {
-        XCTAssertEqual(DisplayWidth.of("Katsumi Kishikawa", inEastAsian: true), 17)
-        XCTAssertEqual(DisplayWidth.of("岸川克己", inEastAsian: true), 8)
-        XCTAssertEqual(DisplayWidth.of("岸川 克己", inEastAsian: true), 9)
-        XCTAssertEqual(DisplayWidth.of("岸川克己😇", inEastAsian: true), 10)
-        XCTAssertEqual(DisplayWidth.of("岸川 克己😇", inEastAsian: true), 11)
-        XCTAssertEqual(DisplayWidth.of("😇岸川克己🇯🇵", inEastAsian: true), 12)
-        XCTAssertEqual(DisplayWidth.of("😇岸川 克己🇯🇵", inEastAsian: true), 13)
+        XCTAssertEqual(__DisplayWidth.of("Katsumi Kishikawa", inEastAsian: true), 17)
+        XCTAssertEqual(__DisplayWidth.of("岸川克己", inEastAsian: true), 8)
+        XCTAssertEqual(__DisplayWidth.of("岸川 克己", inEastAsian: true), 9)
+        XCTAssertEqual(__DisplayWidth.of("岸川克己😇", inEastAsian: true), 10)
+        XCTAssertEqual(__DisplayWidth.of("岸川 克己😇", inEastAsian: true), 11)
+        XCTAssertEqual(__DisplayWidth.of("😇岸川克己🇯🇵", inEastAsian: true), 12)
+        XCTAssertEqual(__DisplayWidth.of("😇岸川 克己🇯🇵", inEastAsian: true), 13)
     }
+    #endif
 }
