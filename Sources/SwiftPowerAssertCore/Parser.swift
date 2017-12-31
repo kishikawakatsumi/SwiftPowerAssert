@@ -60,12 +60,12 @@ class Parser {
             }
         }
 
-        let accessLevel: AccessLevelModifier
+        let accessLevel: String
         let attributes = parseKeyValueAttributes(tokens: tokens)
         if let access = attributes["access"] {
-            accessLevel = AccessLevelModifier(rawValue: access)!
+            accessLevel = access
         } else {
-            accessLevel = .internal
+            accessLevel = "internal"
         }
 
         let typeInheritance = parseInherits(tokens: tokens)
@@ -93,16 +93,11 @@ class Parser {
         let tokens = node.value
 
         var name: String!
-        var modifiers = [DeclarationModifier]()
 
         for token in tokens {
             switch (token.type, token.value) {
             case (.string, _):
                 name = token.value
-            case (.token, "@objc"):
-                modifiers.append(.objc)
-            case (.token, "dynamic"):
-                modifiers.append(.dynamic)
             default:
                 break
             }
@@ -126,17 +121,29 @@ class Parser {
             }
         }
 
-        let throwBehavior: ThrowsModifier? = nil
-
-        let accessLevel: AccessLevelModifier
-        let attributes = parseKeyValueAttributes(tokens: tokens)
-        if let access = attributes["access"] {
-            accessLevel = AccessLevelModifier(rawValue: access)!
-        } else {
-            accessLevel = .internal
+        var throwsModifier: String?
+        for token in tokens {
+            switch (token.type, token.value) {
+            case (.token, "nothrow"):
+                throwsModifier = "nothrow"
+            case (.token, "throws"):
+                throwsModifier = "throws"
+            case (.token, "rethrows"):
+                throwsModifier = "rethrows"
+            default:
+                break
+            }
         }
 
-        return FunctionDeclaration(accessLevel: accessLevel, modifiers: modifiers, name: name, parameters: parameters, throwBehavior: throwBehavior, result: result, body: body)
+        let accessLevel: String
+        let attributes = parseKeyValueAttributes(tokens: tokens)
+        if let access = attributes["access"] {
+            accessLevel = access
+        } else {
+            accessLevel = "internal"
+        }
+
+        return FunctionDeclaration(accessLevel: accessLevel, name: name, parameters: parameters, throwBehavior: throwsModifier, result: result, body: body)
     }
 
     private func parseExpressionNode(node: Node<[Token]>) -> Expression {

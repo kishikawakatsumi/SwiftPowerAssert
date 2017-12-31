@@ -48,7 +48,7 @@ enum Declaration {
 }
 
 struct ClassDeclaration {
-    let accessLevel: AccessLevelModifier
+    let accessLevel: String
     let name: String
     let typeInheritance: String?
     let members: [ClassMember]
@@ -59,11 +59,10 @@ enum ClassMember {
 }
 
 struct FunctionDeclaration {
-    let accessLevel: AccessLevelModifier
-    let modifiers: [DeclarationModifier]
+    let accessLevel: String
     let name: String
     let parameters: [Parameter]
-    let throwBehavior: ThrowsModifier?
+    let throwBehavior: String?
     let result: FunctionResult?
     let body: [Statement]
 }
@@ -74,39 +73,8 @@ struct Parameter {
     let type: String
 }
 
-enum ThrowsModifier {
-    case `throws`, `rethrows`
-}
-
 struct FunctionResult {
     let type: String
-}
-
-enum AccessLevelModifier: String {
-    case `private`
-    case `fileprivate`
-    case `internal`
-    case `public`
-    case `open`
-}
-
-enum DeclarationModifier {
-    case `class`
-    case objc
-    case `dynamic`
-}
-
-extension DeclarationModifier: CustomStringConvertible {
-    var description: String {
-        switch self {
-        case .class:
-            return "class"
-        case .objc:
-            return "@objc"
-        case .dynamic:
-            return "dynamic"
-        }
-    }
 }
 
 struct SourceRange {
