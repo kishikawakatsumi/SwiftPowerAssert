@@ -1461,4 +1461,43 @@ class AssertTests: XCTestCase {
         let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
+
+    func testSelectorExpression() throws {
+        let source = """
+            import XCTest
+
+            class SomeClass: NSObject {
+                @objc let property: String
+                @objc(doSomethingWithInt:)
+                func doSomething(_ x: Int) {}
+
+                init(property: String) {
+                    self.property = property
+                }
+            }
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    assert(#selector(SomeClass.doSomething(_:)) == #selector(getter: NSObjectProtocol.description))
+                    assert(#selector(getter: SomeClass.property) == #selector(getter: NSObjectProtocol.description))
+                }
+            }
+
+            """
+
+        let expected = """
+            assert(#selector(SomeClass.doSomething(_:)) == #selector(getter: NSObjectProtocol.description))
+                                                      | |                                                |
+                                                      | false                                            "description"
+                                                      "doSomethingWithInt:"
+            assert(#selector(getter: SomeClass.property) == #selector(getter: NSObjectProtocol.description))
+                                                       | |                                                |
+                                                       | false                                            "description"
+                                                       "property"
+
+            """
+
+        let result = TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
 }
