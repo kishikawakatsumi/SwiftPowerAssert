@@ -53,8 +53,8 @@ class Instrumentor {
                             declaration.body.forEach {
                                 switch $0 {
                                 case .expression(let expression):
-                                    traverse(expression) {
-                                        if $0.rawValue == "call_expr", !$0.expressions.isEmpty, let decl = $0.expressions[0].decl {
+                                    traverse(expression) { (expression, _) in
+                                        if expression.rawValue == "call_expr", !expression.expressions.isEmpty, let decl = expression.expressions[0].decl {
                                             switch decl {
                                             case "Swift.(file).assert(_:_:file:line:)",
                                                  "XCTest.(file).XCTAssert(_:_:file:line:)",
@@ -66,7 +66,7 @@ class Instrumentor {
                                                  "XCTest.(file).XCTAssertGreaterThanOrEqual(_:_:_:file:line:)",
                                                  "XCTest.(file).XCTAssertLessThanOrEqual(_:_:_:file:line:)",
                                                  "XCTest.(file).XCTAssertLessThan(_:_:_:file:line:)":
-                                                expressions.append($0)
+                                                expressions.append(expression)
                                             default:
                                                 break
                                             }
@@ -170,7 +170,7 @@ class Instrumentor {
         var values = [Int: String]()
         let formatter = Formatter()
 
-        traverse(expression) { (childExpression) in
+        traverse(expression) { (childExpression, skip) in
             guard let wholeRange = expression.range, let valueRange = childExpression.range, wholeRange != valueRange else {
                 return
             }
@@ -180,6 +180,9 @@ class Instrumentor {
             if (childExpression.rawValue == "declref_expr" && !childExpression.type.contains("->")) ||
                 childExpression.rawValue == "magic_identifier_literal_expr" {
                 let source = completeExpressionSource(childExpression, expression)
+                if source.hasPrefix("$") {
+                    return
+                }
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
 
                 let column = columnInFunctionCall(column: valueRange.end.column, startLine: valueRange.start.line, endLine: valueRange.end.line, tokens: tokens, child: childExpression, parent: expression)
@@ -253,9 +256,9 @@ class Instrumentor {
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
 
                 var containsThrowsFunction = false
-                traverse(childExpression) {
+                traverse(childExpression) { (expression, skip) in
                     guard !containsThrowsFunction else { return }
-                    containsThrowsFunction = $0.rawValue == "call_expr" && $0.throwsModifier == "throws"
+                    containsThrowsFunction = expression.rawValue == "call_expr" && expression.throwsModifier == "throws"
                 }
 
                 let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
@@ -267,6 +270,10 @@ class Instrumentor {
 
                 let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
                 values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+            }
+            if childExpression.rawValue == "closure_expr" {
+                skip = true
+                return
             }
         }
 
@@ -510,8 +517,12 @@ class Instrumentor {
         return nil
     }
 
-    private func traverse(_ expression: Expression, closure: (_ expression: Expression) -> ()) {
-        closure(expression)
+    private func traverse(_ expression: Expression, closure: (_ expression: Expression, _ skipChildren: inout Bool) -> ()) {
+        var skip = false
+        closure(expression, &skip)
+        if skip {
+            return
+        }
         for expression in expression.expressions {
             traverse(expression, closure: closure)
         }
