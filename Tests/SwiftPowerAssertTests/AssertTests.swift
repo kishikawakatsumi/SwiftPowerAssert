@@ -968,19 +968,6 @@ class AssertTests: XCTestCase {
                     assert(nested[keyPath: nestedKeyPath] == 13)
                     assert(nested[keyPath: \\OuterStructure.outer.someValue] == 13)
                     assert(nested.getValue(keyPath: \\.outer.someValue) == 13)
-
-                    let greetings = ["hello", "hola", "bonjour", "안녕"]
-
-                    assert(greetings[keyPath: \\[String].[1]] == "hello")
-                    assert(greetings[keyPath: \\[String].first?.count] == 4)
-
-                    let interestingNumbers = ["prime": [2, 3, 5, 7, 11, 13, 15],
-                                              "triangular": [1, 3, 6, 10, 15, 21, 28],
-                                              "hexagonal": [1, 6, 15, 28, 45, 66, 91]]
-                    assert(interestingNumbers[keyPath: \\[String: [Int]].["prime"]]! == [1, 2, 3])
-                    assert(interestingNumbers[keyPath: \\[String: [Int]].["prime"]![0]] != 2)
-                    assert(interestingNumbers[keyPath: \\[String: [Int]].["hexagonal"]!.count] != 7)
-                    assert(interestingNumbers[keyPath: \\[String: [Int]].["hexagonal"]!.count.bitWidth] != 64)
                 }
             }
 
@@ -1027,6 +1014,58 @@ class AssertTests: XCTestCase {
                    |                                |          false
                    |                                Swift.WritableKeyPath<main.OuterStructure, Swift.Int>
                    OuterStructure(outer: main.SomeStructure(someValue: 24))
+
+            """
+
+        let result = TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
+    #if swift(>=4.0.3)
+    func testSubscriptKeyPathExpression() throws {
+        let source = """
+            import XCTest
+
+            struct SomeStructure {
+                var someValue: Int
+
+                func getValue(keyPath: KeyPath<SomeStructure, Int>) -> Int {
+                    return self[keyPath: keyPath]
+                }
+            }
+
+            struct OuterStructure {
+                var outer: SomeStructure
+
+                init(someValue: Int) {
+                    self.outer = SomeStructure(someValue: someValue)
+                }
+
+                func getValue(keyPath: KeyPath<OuterStructure, Int>) -> Int {
+                    return self[keyPath: keyPath]
+                }
+            }
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let greetings = ["hello", "hola", "bonjour", "안녕"]
+
+                    assert(greetings[keyPath: \\[String].[1]] == "hello")
+                    assert(greetings[keyPath: \\[String].first?.count] == 4)
+
+                    let interestingNumbers = ["prime": [2, 3, 5, 7, 11, 13, 15],
+                                              "triangular": [1, 3, 6, 10, 15, 21, 28],
+                                              "hexagonal": [1, 6, 15, 28, 45, 66, 91]]
+                    assert(interestingNumbers[keyPath: \\[String: [Int]].["prime"]]! == [1, 2, 3])
+                    assert(interestingNumbers[keyPath: \\[String: [Int]].["prime"]![0]] != 2)
+                    assert(interestingNumbers[keyPath: \\[String: [Int]].["hexagonal"]!.count] != 7)
+                    assert(interestingNumbers[keyPath: \\[String: [Int]].["hexagonal"]!.count.bitWidth] != 64)
+                }
+            }
+
+            """
+
+        let expected = """
             assert(greetings[keyPath: \\[String].[1]] == "hello")
                    |                             ||| |  |
                    |                             ||| |  "hello"
@@ -1076,6 +1115,7 @@ class AssertTests: XCTestCase {
         let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
+    #endif
 
     func testInitializerExpression() throws {
         let source = """

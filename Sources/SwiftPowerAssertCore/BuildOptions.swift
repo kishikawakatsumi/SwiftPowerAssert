@@ -81,18 +81,32 @@ public enum SDK {
         }
     }
 
-    public func path() -> String {
+    public func path() throws -> String {
         let shell = Process(arguments: ["/usr/bin/xcrun", "--sdk", "\(self)", "--show-sdk-path"])
         try! shell.launch()
-        let result = try! shell.waitUntilExit().utf8Output()
-        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+        let result = try! shell.waitUntilExit()
+        let output = try! result.utf8Output()
+        switch result.exitStatus {
+        case .terminated(let code) where code == 0:
+            return output.trimmingCharacters(in: .whitespacesAndNewlines)
+        default:
+            let error = try! result.utf8stderrOutput()
+            throw SwiftPowerAssertError.taskError(error)
+        }
     }
 
-    public func version() -> String {
-        let shell = Process(arguments: ["defaults", "read", "\(path())/SDKSettings.plist", "Version"])
+    public func version() throws -> String {
+        let shell = Process(arguments: ["defaults", "read", "\(try path())/SDKSettings.plist", "Version"])
         try! shell.launch()
-        let result = try! shell.waitUntilExit().utf8Output()
-        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+        let result = try! shell.waitUntilExit()
+        let output = try! result.utf8Output()
+        switch result.exitStatus {
+        case .terminated(let code) where code == 0:
+            return output.trimmingCharacters(in: .whitespacesAndNewlines)
+        default:
+            let error = try! result.utf8stderrOutput()
+            throw SwiftPowerAssertError.taskError(error)
+        }
     }
 }
 
