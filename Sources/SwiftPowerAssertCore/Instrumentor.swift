@@ -61,7 +61,11 @@ class Instrumentor {
                                                  "XCTest.(file).XCTAssertTrue(_:_:file:line:)",
                                                  "XCTest.(file).XCTAssertFalse(_:_:file:line:)",
                                                  "XCTest.(file).XCTAssertEqual(_:_:_:file:line:)",
-                                                 "XCTest.(file).XCTAssertNotEqual(_:_:_:file:line:)":
+                                                 "XCTest.(file).XCTAssertNotEqual(_:_:_:file:line:)",
+                                                 "XCTest.(file).XCTAssertGreaterThan(_:_:_:file:line:)",
+                                                 "XCTest.(file).XCTAssertGreaterThanOrEqual(_:_:_:file:line:)",
+                                                 "XCTest.(file).XCTAssertLessThanOrEqual(_:_:_:file:line:)",
+                                                 "XCTest.(file).XCTAssertLessThan(_:_:_:file:line:)":
                                                 expressions.append($0)
                                             default:
                                                 break
@@ -128,12 +132,32 @@ class Instrumentor {
             case "XCTest.(file).XCTAssertEqual(_:_:_:file:line:)":
                 if let tupleExpression = findFirst(expression, where: { $0.rawValue == "tuple_expr" }) {
                     let values = recordValues(expression)
-                    return instrument(XCTAssertEqual: expression, tupleExpression: tupleExpression, values: values)
+                    return instrument(equality: expression, tupleExpression: tupleExpression, values: values)
                 }
             case "XCTest.(file).XCTAssertNotEqual(_:_:_:file:line:)":
                 if let tupleExpression = findFirst(expression, where: { $0.rawValue == "tuple_expr" }) {
                     let values = recordValues(expression)
-                    return instrument(XCTAssertEqual: expression, tupleExpression: tupleExpression, values: values, failureCondition: true)
+                    return instrument(equality: expression, tupleExpression: tupleExpression, values: values, failureCondition: true)
+                }
+            case "XCTest.(file).XCTAssertGreaterThan(_:_:_:file:line:)":
+                if let tupleExpression = findFirst(expression, where: { $0.rawValue == "tuple_expr" }) {
+                    let values = recordValues(expression)
+                    return instrument(greaterThan: expression, tupleExpression: tupleExpression, values: values)
+                }
+            case "XCTest.(file).XCTAssertGreaterThanOrEqual(_:_:_:file:line:)":
+                if let tupleExpression = findFirst(expression, where: { $0.rawValue == "tuple_expr" }) {
+                    let values = recordValues(expression)
+                    return instrument(greaterThanOrEqual: expression, tupleExpression: tupleExpression, values: values)
+                }
+            case "XCTest.(file).XCTAssertLessThanOrEqual(_:_:_:file:line:)":
+                if let tupleExpression = findFirst(expression, where: { $0.rawValue == "tuple_expr" }) {
+                    let values = recordValues(expression)
+                    return instrument(greaterThan: expression, tupleExpression: tupleExpression, values: values, failureCondition: true)
+                }
+            case "XCTest.(file).XCTAssertLessThan(_:_:_:file:line:)":
+                if let tupleExpression = findFirst(expression, where: { $0.rawValue == "tuple_expr" }) {
+                    let values = recordValues(expression)
+                    return instrument(greaterThanOrEqual: expression, tupleExpression: tupleExpression, values: values, failureCondition: true)
                 }
             default:
                 break
@@ -264,10 +288,26 @@ class Instrumentor {
         return instrument(expression: expression, recordValues: recordValues, condition: condition, assertion: assertion, failureCondition: failureCondition)
     }
 
-    private func instrument(XCTAssertEqual expression: Expression, tupleExpression: Expression, values: [Int: String], failureCondition: Bool = false) -> String {
+    private func instrument(equality expression: Expression, tupleExpression: Expression, values: [Int: String], failureCondition: Bool = false) -> String {
         let formatter = Formatter()
         let recordValues = recordValuesCodeFragment(values: values)
-        let condition = "__Util.condition(\(formatter.format(tokens: formatter.tokenize(source: tupleExpression.source))))"
+        let condition = "__Util.equal(\(formatter.format(tokens: formatter.tokenize(source: tupleExpression.source))))"
+        let assertion = formatter.escaped(tokens: formatter.tokenize(source: expression.source))
+        return instrument(expression: expression, recordValues: recordValues, condition: condition, assertion: assertion, failureCondition: failureCondition)
+    }
+
+    private func instrument(greaterThan expression: Expression, tupleExpression: Expression, values: [Int: String], failureCondition: Bool = false) -> String {
+        let formatter = Formatter()
+        let recordValues = recordValuesCodeFragment(values: values)
+        let condition = "__Util.greaterThan(\(formatter.format(tokens: formatter.tokenize(source: tupleExpression.source))))"
+        let assertion = formatter.escaped(tokens: formatter.tokenize(source: expression.source))
+        return instrument(expression: expression, recordValues: recordValues, condition: condition, assertion: assertion, failureCondition: failureCondition)
+    }
+
+    private func instrument(greaterThanOrEqual expression: Expression, tupleExpression: Expression, values: [Int: String], failureCondition: Bool = false) -> String {
+        let formatter = Formatter()
+        let recordValues = recordValuesCodeFragment(values: values)
+        let condition = "__Util.greaterThanOrEqual(\(formatter.format(tokens: formatter.tokenize(source: tupleExpression.source))))"
         let assertion = formatter.escaped(tokens: formatter.tokenize(source: expression.source))
         return instrument(expression: expression, recordValues: recordValues, condition: condition, assertion: assertion, failureCondition: failureCondition)
     }
@@ -278,77 +318,101 @@ class Instrumentor {
 
         do {
             struct __Util {
-                static func condition<T>(_ parameters: (lhs: T, rhs: T)) -> Bool where T: Equatable {
+                static func equal<T>(_ parameters: (lhs: T, rhs: T)) -> Bool where T: Equatable {
                     return parameters.lhs == parameters.rhs
                 }
-                static func condition<T>(_ parameters: (lhs: T, rhs: T, message: String)) -> Bool where T: Equatable {
-                    return condition((parameters.lhs, parameters.rhs))
+                static func equal<T>(_ parameters: (lhs: T, rhs: T, message: String)) -> Bool where T: Equatable {
+                    return equal((parameters.lhs, parameters.rhs))
                 }
-                static func condition<T>(_ parameters: (lhs: T, rhs: T, message: String, file: StaticString)) -> Bool where T: Equatable {
-                    return condition((parameters.lhs, parameters.rhs))
+                static func equal<T>(_ parameters: (lhs: T, rhs: T, message: String, file: StaticString)) -> Bool where T: Equatable {
+                    return equal((parameters.lhs, parameters.rhs))
                 }
-                static func condition<T>(_ parameters: (lhs: T, rhs: T, message: String, file: StaticString, line: UInt)) -> Bool where T: Equatable {
-                    return condition((parameters.lhs, parameters.rhs))
+                static func equal<T>(_ parameters: (lhs: T, rhs: T, message: String, file: StaticString, line: UInt)) -> Bool where T: Equatable {
+                    return equal((parameters.lhs, parameters.rhs))
                 }
-                static func condition<T>(_ parameters: (lhs: T?, rhs: T?)) -> Bool where T: Equatable {
+                static func equal<T>(_ parameters: (lhs: T?, rhs: T?)) -> Bool where T: Equatable {
                     return parameters.lhs == parameters.rhs
                 }
-                static func condition<T>(_ parameters: (lhs: T?, rhs: T?, message: String)) -> Bool where T: Equatable {
-                    return condition((parameters.lhs, parameters.rhs))
+                static func equal<T>(_ parameters: (lhs: T?, rhs: T?, message: String)) -> Bool where T: Equatable {
+                    return equal((parameters.lhs, parameters.rhs))
                 }
-                static func condition<T>(_ parameters: (lhs: T?, rhs: T?, message: String, file: StaticString)) -> Bool where T: Equatable {
-                    return condition((parameters.lhs, parameters.rhs))
+                static func equal<T>(_ parameters: (lhs: T?, rhs: T?, message: String, file: StaticString)) -> Bool where T: Equatable {
+                    return equal((parameters.lhs, parameters.rhs))
                 }
-                static func condition<T>(_ parameters: (lhs: T?, rhs: T?, message: String, file: StaticString, line: UInt)) -> Bool where T: Equatable {
-                    return condition((parameters.lhs, parameters.rhs))
+                static func equal<T>(_ parameters: (lhs: T?, rhs: T?, message: String, file: StaticString, line: UInt)) -> Bool where T: Equatable {
+                    return equal((parameters.lhs, parameters.rhs))
                 }
-                static func condition<T>(_ parameters: (lhs: [T], rhs: [T])) -> Bool where T: Equatable {
+                static func equal<T>(_ parameters: (lhs: [T], rhs: [T])) -> Bool where T: Equatable {
                     return parameters.lhs == parameters.rhs
                 }
-                static func condition<T>(_ parameters: (lhs: [T], rhs: [T], message: String)) -> Bool where T: Equatable {
-                    return condition((parameters.lhs, parameters.rhs))
+                static func equal<T>(_ parameters: (lhs: [T], rhs: [T], message: String)) -> Bool where T: Equatable {
+                    return equal((parameters.lhs, parameters.rhs))
                 }
-                static func condition<T>(_ parameters: (lhs: [T], rhs: [T], message: String, file: StaticString)) -> Bool where T: Equatable {
-                    return condition((parameters.lhs, parameters.rhs))
+                static func equal<T>(_ parameters: (lhs: [T], rhs: [T], message: String, file: StaticString)) -> Bool where T: Equatable {
+                    return equal((parameters.lhs, parameters.rhs))
                 }
-                static func condition<T>(_ parameters: (lhs: [T], rhs: [T], message: String, file: StaticString, line: UInt)) -> Bool where T: Equatable {
-                    return condition((parameters.lhs, parameters.rhs))
+                static func equal<T>(_ parameters: (lhs: [T], rhs: [T], message: String, file: StaticString, line: UInt)) -> Bool where T: Equatable {
+                    return equal((parameters.lhs, parameters.rhs))
                 }
-                static func condition<T>(_ parameters: (lhs: ArraySlice<T>, rhs: ArraySlice<T>)) -> Bool where T: Equatable {
+                static func equal<T>(_ parameters: (lhs: ArraySlice<T>, rhs: ArraySlice<T>)) -> Bool where T: Equatable {
                     return parameters.lhs == parameters.rhs
                 }
-                static func condition<T>(_ parameters: (lhs: ArraySlice<T>, rhs: ArraySlice<T>, message: String)) -> Bool where T: Equatable {
-                    return condition((parameters.lhs, parameters.rhs))
+                static func equal<T>(_ parameters: (lhs: ArraySlice<T>, rhs: ArraySlice<T>, message: String)) -> Bool where T: Equatable {
+                    return equal((parameters.lhs, parameters.rhs))
                 }
-                static func condition<T>(_ parameters: (lhs: ArraySlice<T>, rhs: ArraySlice<T>, message: String, file: StaticString)) -> Bool where T: Equatable {
-                    return condition((parameters.lhs, parameters.rhs))
+                static func equal<T>(_ parameters: (lhs: ArraySlice<T>, rhs: ArraySlice<T>, message: String, file: StaticString)) -> Bool where T: Equatable {
+                    return equal((parameters.lhs, parameters.rhs))
                 }
-                static func condition<T>(_ parameters: (lhs: ArraySlice<T>, rhs: ArraySlice<T>, message: String, file: StaticString, line: UInt)) -> Bool where T: Equatable {
-                    return condition((parameters.lhs, parameters.rhs))
+                static func equal<T>(_ parameters: (lhs: ArraySlice<T>, rhs: ArraySlice<T>, message: String, file: StaticString, line: UInt)) -> Bool where T: Equatable {
+                    return equal((parameters.lhs, parameters.rhs))
                 }
-                static func condition<T>(_ parameters: (lhs: ContiguousArray<T>, rhs: ContiguousArray<T>)) -> Bool where T: Equatable {
+                static func equal<T>(_ parameters: (lhs: ContiguousArray<T>, rhs: ContiguousArray<T>)) -> Bool where T: Equatable {
                     return parameters.lhs == parameters.rhs
                 }
-                static func condition<T>(_ parameters: (lhs: ContiguousArray<T>, rhs: ContiguousArray<T>, message: String)) -> Bool where T: Equatable {
-                    return condition((parameters.lhs, parameters.rhs))
+                static func equal<T>(_ parameters: (lhs: ContiguousArray<T>, rhs: ContiguousArray<T>, message: String)) -> Bool where T: Equatable {
+                    return equal((parameters.lhs, parameters.rhs))
                 }
-                static func condition<T>(_ parameters: (lhs: ContiguousArray<T>, rhs: ContiguousArray<T>, message: String, file: StaticString)) -> Bool where T: Equatable {
-                    return condition((parameters.lhs, parameters.rhs))
+                static func equal<T>(_ parameters: (lhs: ContiguousArray<T>, rhs: ContiguousArray<T>, message: String, file: StaticString)) -> Bool where T: Equatable {
+                    return equal((parameters.lhs, parameters.rhs))
                 }
-                static func condition<T>(_ parameters: (lhs: ContiguousArray<T>, rhs: ContiguousArray<T>, message: String, file: StaticString, line: UInt)) -> Bool where T: Equatable {
-                    return condition((parameters.lhs, parameters.rhs))
+                static func equal<T>(_ parameters: (lhs: ContiguousArray<T>, rhs: ContiguousArray<T>, message: String, file: StaticString, line: UInt)) -> Bool where T: Equatable {
+                    return equal((parameters.lhs, parameters.rhs))
                 }
-                static func condition<T, U>(_ parameters: (lhs: [T: U], rhs: [T: U])) -> Bool where U: Equatable {
+                static func equal<T, U>(_ parameters: (lhs: [T: U], rhs: [T: U])) -> Bool where U: Equatable {
                     return parameters.lhs == parameters.rhs
                 }
-                static func condition<T, U>(_ parameters: (lhs: [T: U], rhs: [T: U], message: String)) -> Bool where U: Equatable {
-                    return condition((parameters.lhs, parameters.rhs))
+                static func equal<T, U>(_ parameters: (lhs: [T: U], rhs: [T: U], message: String)) -> Bool where U: Equatable {
+                    return equal((parameters.lhs, parameters.rhs))
                 }
-                static func condition<T, U>(_ parameters: (lhs: [T: U], rhs: [T: U], message: String, file: StaticString)) -> Bool where U: Equatable {
-                    return condition((parameters.lhs, parameters.rhs))
+                static func equal<T, U>(_ parameters: (lhs: [T: U], rhs: [T: U], message: String, file: StaticString)) -> Bool where U: Equatable {
+                    return equal((parameters.lhs, parameters.rhs))
                 }
-                static func condition<T, U>(_ parameters: (lhs: [T: U], rhs: [T: U], message: String, file: StaticString, line: UInt)) -> Bool where U: Equatable {
-                    return condition((parameters.lhs, parameters.rhs))
+                static func equal<T, U>(_ parameters: (lhs: [T: U], rhs: [T: U], message: String, file: StaticString, line: UInt)) -> Bool where U: Equatable {
+                    return equal((parameters.lhs, parameters.rhs))
+                }
+                static func greaterThan<T>(_ parameters: (lhs: T, rhs: T)) -> Bool where T: Comparable {
+                    return parameters.lhs > parameters.rhs
+                }
+                static func greaterThan<T>(_ parameters: (lhs: T, rhs: T, message: String)) -> Bool where T: Comparable {
+                    return greaterThan((parameters.lhs, parameters.rhs))
+                }
+                static func greaterThan<T>(_ parameters: (lhs: T, rhs: T, message: String, file: StaticString)) -> Bool where T: Comparable {
+                    return greaterThan((parameters.lhs, parameters.rhs))
+                }
+                static func greaterThan<T>(_ parameters: (lhs: T, rhs: T, message: String, file: StaticString, line: UInt)) -> Bool where T: Comparable {
+                    return greaterThan((parameters.lhs, parameters.rhs))
+                }
+                static func greaterThanOrEqual<T>(_ parameters: (lhs: T, rhs: T)) -> Bool where T: Comparable {
+                    return parameters.lhs >= parameters.rhs
+                }
+                static func greaterThanOrEqual<T>(_ parameters: (lhs: T, rhs: T, message: String)) -> Bool where T: Comparable {
+                    return greaterThanOrEqual((parameters.lhs, parameters.rhs))
+                }
+                static func greaterThanOrEqual<T>(_ parameters: (lhs: T, rhs: T, message: String, file: StaticString)) -> Bool where T: Comparable {
+                    return greaterThanOrEqual((parameters.lhs, parameters.rhs))
+                }
+                static func greaterThanOrEqual<T>(_ parameters: (lhs: T, rhs: T, message: String, file: StaticString, line: UInt)) -> Bool where T: Comparable {
+                    return greaterThanOrEqual((parameters.lhs, parameters.rhs))
                 }
             }
             func __toString<T>(_ value: T?) -> String {
