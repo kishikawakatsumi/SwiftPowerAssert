@@ -31,10 +31,14 @@ struct TestCommand {
         var iterator = xcarguments.enumerated().makeIterator()
         var buildActions = [(Int, String)]()
         var testOnlyOptions = [(Int, String)]()
+        var configurationOptionExists = false
         while let (index, option) = iterator.next() {
             switch option {
-            case "-project", "-target", "-workspace", "-scheme", "-configuration", "-xcconfig", "-toolchain", "-find-executable",
+            case "-project", "-target", "-workspace", "-scheme", "-xcconfig", "-toolchain", "-find-executable",
                  "-find-library", "-resultBundlePath", "-derivedDataPath", "-archivePath", "-exportOptionsPlist":
+                _ = iterator.next()
+            case "-configuration":
+                configurationOptionExists = true
                 _ = iterator.next()
             case "-enableCodeCoverage", "-testLanguage", "-testRegion":
                 testOnlyOptions.append((index, option))
@@ -56,17 +60,22 @@ struct TestCommand {
             throw SwiftPowerAssertError.invalidArgument("xcodebuild action can only be specified as 'test' or 'build-for-testing'")
         }
 
-        let indicesToBeRemoved = buildActions.map { $0.0 } + testOnlyOptions.map{ $0.0 }
-        let buildOptions = xcarguments.enumerated().filter { !indicesToBeRemoved.contains($0.offset) }.map { $0.element } + ["ONLY_ACTIVE_ARCH=NO"]
-
         let xcodebuild = Xcodebuild()
-        try xcodebuild.build(arguments: buildOptions)
-
         let rawBuildSettings = try xcodebuild.showBuildSettings(arguments: xcarguments + ["ONLY_ACTIVE_ARCH=NO"])
         let buildSettings = BuildSettings.parse(rawBuildSettings)
         guard let targetBuildSettings = buildSettings.values.filter({ $0.settings["PRODUCT_TYPE"] == "com.apple.product-type.bundle.unit-test" }).first else {
             throw SwiftPowerAssertError.noUnitTestBundle
         }
+
+        let indicesToBeRemoved = buildActions.map { $0.0 } + testOnlyOptions.map{ $0.0 }
+        let buildOptions = xcarguments.enumerated().filter { !indicesToBeRemoved.contains($0.offset) }.map { $0.element }
+
+        var additionalOptions = ["ONLY_ACTIVE_ARCH=NO"]
+        if !configurationOptionExists {
+            additionalOptions.append("-configuration")
+            additionalOptions.append(targetBuildSettings.settings["CONFIGURATION"]!)
+        }
+        try xcodebuild.build(arguments: buildOptions + additionalOptions)
 
         let sdkName = targetBuildSettings.settings["SDK_NAME"]!
         let sdkRoot = targetBuildSettings.settings["SDKROOT"]!
