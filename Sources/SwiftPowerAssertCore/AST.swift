@@ -34,7 +34,6 @@ struct Expression {
     let rawRange: String!
     let location: SourceLocation!
     let range: SourceRange!
-    let source: String!
     let decl: String?
     let value: String?
     let throwsModifier: String?
