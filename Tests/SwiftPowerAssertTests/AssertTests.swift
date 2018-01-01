@@ -775,7 +775,7 @@ class AssertTests: XCTestCase {
             }
 
             """
-        // FIXME: `#line` shouldn't be changed due to instrument code
+        
         let expected = """
             assert(#file == "*.swift" && #line == 1 && #column == 2 && #function == "function")
                    |     |  |         |  |     |  | |  |       |  | |  |         |  |

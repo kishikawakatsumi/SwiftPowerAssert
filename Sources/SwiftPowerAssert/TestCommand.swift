@@ -87,7 +87,7 @@ struct TestCommand {
         for source in sources {
             var isDirectory: ObjCBool = false
             if FileManager.default.fileExists(atPath: source.path, isDirectory: &isDirectory) && !isDirectory.boolValue {
-                let temporaryFile = try! TemporaryFile(dir: temporaryDirectory.path, suffix: source.lastPathComponent)
+                let temporaryFile = try! TemporaryFile(dir: temporaryDirectory.path, prefix: "Backup", suffix: source.lastPathComponent)
                 try! FileManager.default.removeItem(atPath: temporaryFile.path.asString)
                 try! FileManager.default.copyItem(atPath: source.path, toPath: temporaryFile.path.asString)
                 backupFiles[source.path] = temporaryFile
