@@ -192,7 +192,7 @@ class Instrumentor {
                     values[column] = formatter.format(tokens: formatter.tokenize(source: source))
                 }
             }
-            if childExpression.rawValue == "member_ref_expr" ||  childExpression.rawValue == "dot_self_expr" {
+            if (childExpression.rawValue == "member_ref_expr" && !childExpression.type.contains("->")) || childExpression.rawValue == "dot_self_expr" {
                 let source = completeExpressionSource(childExpression, expression)
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
 
@@ -226,7 +226,8 @@ class Instrumentor {
                 let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
                 values[column] = formatter.format(tokens: formatter.tokenize(source: source)) + " as \(childExpression.type!)"
             }
-            if childExpression.rawValue == "subscript_expr" || childExpression.rawValue == "keypath_application_expr" {
+            if childExpression.rawValue == "subscript_expr" || childExpression.rawValue == "keypath_application_expr" ||
+                childExpression.rawValue == "objc_selector_expr" {
                 let source = valueExpressionSource
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
 
@@ -425,7 +426,7 @@ class Instrumentor {
             }
             func __toString<T>(_ value: T?) -> String {
                 switch value {
-                case .some(let v) where v is String: return "\\"\\(v)\\"".replacingOccurrences(of: "\\n", with: " ")
+                case .some(let v) where v is String ||  v is Selector: return "\\"\\(v)\\"".replacingOccurrences(of: "\\n", with: " ")
                 case .some(let v): return "\\(v)".replacingOccurrences(of: "\\n", with: " ")
                 case .none: return "nil"
                 }
