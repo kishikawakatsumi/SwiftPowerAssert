@@ -1535,4 +1535,34 @@ class AssertTests: XCTestCase {
         let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
+
+    func testMessageParameters() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let zero = 0
+                    let one = 1
+                    let two = 2
+                    let three = 3
+
+                    let array = [one, two, three]
+                    assert(array.description.hasPrefix("[") == false && array.description.hasPrefix("Hello") == true, "message")
+                }
+            }
+            """
+
+        let expected = """
+            assert(array.description.hasPrefix("[") == false && array.description.hasPrefix("Hello") == true, "message")
+                   |     |           |         |    |  |     |  |     |           |         |        |  |
+                   |     "[1, 2, 3]" true      "["  |  false |  |     "[1, 2, 3]" false     "Hello"  |  true
+                   [1, 2, 3]                        false    |  [1, 2, 3]                            false
+                                                             false
+
+            """
+
+        let result = TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
 }

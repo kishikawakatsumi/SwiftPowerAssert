@@ -47,7 +47,7 @@ extension Expression: Hashable {
     }
 
     static func ==(lhs: Expression, rhs: Expression) -> Bool {
-        return lhs.range == rhs.range
+        return lhs.range == rhs.range && lhs.rawValue == rhs.rawValue
     }
 }
 

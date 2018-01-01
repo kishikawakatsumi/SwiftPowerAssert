@@ -124,39 +124,39 @@ class Instrumentor {
             case "Swift.(file).assert(_:_:file:line:)",
                  "XCTest.(file).XCTAssert(_:_:file:line:)",
                  "XCTest.(file).XCTAssertTrue(_:_:file:line:)":
-                let values = recordValues(expression)
+                let values = recordValues(expression, 1)
                 return instrument(expression: expression, with: values)
             case "XCTest.(file).XCTAssertFalse(_:_:file:line:)":
-                let values = recordValues(expression)
+                let values = recordValues(expression, 1)
                 return instrument(expression: expression, with: values, failureCondition: true)
             case "XCTest.(file).XCTAssertEqual(_:_:_:file:line:)":
                 if let tupleExpression = findFirst(expression, where: { $0.rawValue == "tuple_expr" }) {
-                    let values = recordValues(expression)
+                    let values = recordValues(expression, 2)
                     return instrument(equality: expression, tupleExpression: tupleExpression, values: values)
                 }
             case "XCTest.(file).XCTAssertNotEqual(_:_:_:file:line:)":
                 if let tupleExpression = findFirst(expression, where: { $0.rawValue == "tuple_expr" }) {
-                    let values = recordValues(expression)
+                    let values = recordValues(expression, 2)
                     return instrument(equality: expression, tupleExpression: tupleExpression, values: values, failureCondition: true)
                 }
             case "XCTest.(file).XCTAssertGreaterThan(_:_:_:file:line:)":
                 if let tupleExpression = findFirst(expression, where: { $0.rawValue == "tuple_expr" }) {
-                    let values = recordValues(expression)
+                    let values = recordValues(expression, 2)
                     return instrument(greaterThan: expression, tupleExpression: tupleExpression, values: values)
                 }
             case "XCTest.(file).XCTAssertGreaterThanOrEqual(_:_:_:file:line:)":
                 if let tupleExpression = findFirst(expression, where: { $0.rawValue == "tuple_expr" }) {
-                    let values = recordValues(expression)
+                    let values = recordValues(expression, 2)
                     return instrument(greaterThanOrEqual: expression, tupleExpression: tupleExpression, values: values)
                 }
             case "XCTest.(file).XCTAssertLessThanOrEqual(_:_:_:file:line:)":
                 if let tupleExpression = findFirst(expression, where: { $0.rawValue == "tuple_expr" }) {
-                    let values = recordValues(expression)
+                    let values = recordValues(expression, 2)
                     return instrument(greaterThan: expression, tupleExpression: tupleExpression, values: values, failureCondition: true)
                 }
             case "XCTest.(file).XCTAssertLessThan(_:_:_:file:line:)":
                 if let tupleExpression = findFirst(expression, where: { $0.rawValue == "tuple_expr" }) {
-                    let values = recordValues(expression)
+                    let values = recordValues(expression, 2)
                     return instrument(greaterThanOrEqual: expression, tupleExpression: tupleExpression, values: values, failureCondition: true)
                 }
             default:
@@ -166,11 +166,18 @@ class Instrumentor {
         return source(from: expression.range)
     }
 
-    private func recordValues(_ expression: Expression) -> [Int: String] {
+    private func recordValues(_ expression: Expression, _ numberOfParameters: Int) -> [Int: String] {
         var values = [Int: String]()
         let formatter = Formatter()
 
+        let tupleExpression = findFirst(expression) { $0.rawValue == "tuple_expr" }
+        let sentinel = findSentinelExpression(expression: tupleExpression!, numberOfParameters)
+
         traverse(expression) { (childExpression, skip) in
+            if childExpression == sentinel {
+                skip = true
+                return
+            }
             guard let wholeRange = expression.range, let valueRange = childExpression.range, wholeRange != valueRange else {
                 return
             }
@@ -295,7 +302,7 @@ class Instrumentor {
         let tupleExpressionSource = source(from: tupleExpression.range)
         let formatter = Formatter()
         let recordValues = recordValuesCodeFragment(values: values)
-        let condition = formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource), withHint: tupleExpression)
+        let condition = "__Util.equal(\(formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource), withHint: tupleExpression)))"
         let assertion = formatter.escaped(tokens: formatter.tokenize(source: expressionSource), withHint: tupleExpression)
         return instrument(expression: expression, recordValues: recordValues, condition: condition, assertion: assertion, failureCondition: failureCondition)
     }
@@ -338,6 +345,12 @@ class Instrumentor {
 
         do {
             struct __Util {
+                static func equal(_ parameters: (Bool)) -> Bool {
+                    return parameters
+                }
+                static func equal(_ parameters: (condition: Bool, message: String)) -> Bool {
+                    return parameters.condition
+                }
                 static func equal<T>(_ parameters: (lhs: T, rhs: T)) -> Bool where T: Equatable {
                     return parameters.lhs == parameters.rhs
                 }
@@ -530,6 +543,24 @@ class Instrumentor {
         for expression in expression.expressions {
             traverse(expression, closure: closure)
         }
+    }
+
+    private func findSentinelExpression(expression: Expression, _ numberOfParameters: Int) -> Expression? {
+        var sentinel: Expression?
+        var sentinelParent: Expression?
+        var current: Expression?
+        traverse(expression) { (childExpression, skip) in
+            if childExpression.rawValue == "autoclosure_expr" {
+                sentinelParent = current
+                skip = true
+                return
+            }
+            current = childExpression
+        }
+        if let sentinelParent = sentinelParent, numberOfParameters < sentinelParent.expressions.count {
+            sentinel = sentinelParent.expressions[numberOfParameters]
+        }
+        return sentinel
     }
 
     private func completeExpressionSource(_ child: Expression, _ parent: Expression) -> String {
