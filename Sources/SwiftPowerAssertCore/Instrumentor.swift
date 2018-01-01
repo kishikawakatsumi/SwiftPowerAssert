@@ -815,7 +815,8 @@ class Instrumentor {
                     let needed = isSemicolonNeeded(line: line, column: column, expression: expression)
                     let required = isSemicolonRequired(startIndex: index, tokens: tokens)
                     let canAppend = canAppendSemicolon(startIndex: index, tokens: tokens)
-                    formatted += (needed || required) && canAppend ? ";" : " "
+                    let isAbleToAppend = isAbleToAppendSemicolon(startIndex: index, tokens: tokens, line: line, column: column, expression: expression)
+                    formatted += (needed || required) && canAppend && isAbleToAppend ? ";" : " "
                     column = 0
                     line += 1
                 }
@@ -849,20 +850,20 @@ class Instrumentor {
             for (index, token) in tokens.enumerated() {
                 switch token.type {
                 case .token:
-                    let value = token.value.replacingOccurrences(of: "\\", with: "\\\\")
-                    formatted += value
+                    let value = token.value
+                    formatted += value.replacingOccurrences(of: "\\", with: "\\\\")
                     column += value.utf8.count
                 case .string:
-                    let string = "\\\"" + token.value.replacingOccurrences(of: "\"", with: "\\\\\"") + "\\\""
-                    formatted += string
-                    column += string.utf8.count
+                    formatted += "\\\"" + token.value.replacingOccurrences(of: "\"", with: "\\\\\"") + "\\\""
+                    column += token.value.utf8.count + 2
                 case .indent(let count):
                     column += count
                 case .newline:
                     let needed = isSemicolonNeeded(line: line, column: column, expression: expression)
                     let required = isSemicolonRequired(startIndex: index, tokens: tokens)
                     let canAppend = canAppendSemicolon(startIndex: index, tokens: tokens)
-                    formatted += (needed || required) && canAppend ? ";" : " "
+                    let isAbleToAppend = isAbleToAppendSemicolon(startIndex: index, tokens: tokens, line: line, column: column, expression: expression)
+                    formatted += (needed || required) && canAppend && isAbleToAppend ? ";" : " "
                     column = 0
                     line += 1
                 }
@@ -887,10 +888,9 @@ class Instrumentor {
                 guard let range = expression.range else {
                     return
                 }
-                if (expression.rawValue == "binary_expr" || expression.rawValue == "erasure_expr" ||
-                    expression.rawValue == "call_expr" || expression.rawValue == "dot_syntax_call_expr" ||
-                    expression.rawValue == "tuple_expr" || expression.rawValue == "tuple_shuffle_expr" ||
-                    expression.rawValue == "paren_expr") && line == range.end.line && column == range.end.column {
+                if (expression.rawValue == "binary_expr" || expression.rawValue == "erasure_expr" || expression.rawValue == "call_expr" ||
+                    expression.rawValue == "tuple_expr" || expression.rawValue == "tuple_shuffle_expr" || expression.rawValue == "paren_expr") &&
+                    line == range.end.line && column == range.end.column {
                     skip = true
                     semicolonNeeded = true
                     return
@@ -939,6 +939,43 @@ class Instrumentor {
                 }
             }
             return true
+        }
+
+        private func isAbleToAppendSemicolon(startIndex index: Int, tokens: [Instrumentor.Formatter.Token], line l: Int, column c: Int, expression: Expression) -> Bool {
+            var line = l
+            var column = c
+
+            loop: for i in index..<tokens.count {
+                let token = tokens[i]
+                switch token.type {
+                case .token:
+                    column += 1
+                    break loop
+                case .string:
+                    column += 1
+                    break loop
+                case .indent(let count):
+                    column += count
+                case .newline:
+                    column = 0
+                    line += 1
+                }
+            }
+
+            var isAbleToAppendSemicolon = true
+            traverse(expression) { (expression, skip) in
+                guard let location = expression.location else {
+                    return
+                }
+                if (expression.rawValue == "binary_expr") {
+                    if line == location.line && column == location.column {
+                        skip = true
+                        isAbleToAppendSemicolon = false
+                        return
+                    }
+                }
+            }
+            return isAbleToAppendSemicolon
         }
 
         class Token {
