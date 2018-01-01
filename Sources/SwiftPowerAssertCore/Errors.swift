@@ -21,5 +21,8 @@ import Foundation
 public enum SwiftPowerAssertError: Error {
     case buildFailed(String)
     case taskError(String)
+    case invalidArgument(String)
+    case noUnitTestBundle
+    case writeFailed(String, Error)
     case internalError(String, Error)
 }

@@ -21,16 +21,6 @@ import Basic
 import Utility
 import SwiftPowerAssertCore
 
-enum CommandError: Error {
-    case writeFailed(String, Error)
-    case fileExists(String)
-    case noUnitTestBundle
-    case argumentError(String)
-    case buildFailed(Error)
-    case instrumentFailed(Error)
-    case executionFailed(Error)
-}
-
 do {
     let parser = ArgumentParser(commandName: "swift-power-assert", usage: "SUBCOMMAND", overview: "SwiftPowerAssert, provide diagrammed assertions in Swift")
 
@@ -63,19 +53,17 @@ do {
     print("swift-power-assert: error: unexpected argument \(argument); use --help to list available arguments")
 } catch ArgumentParserError.expectedArguments(_, let arguments) {
     print("swift-power-assert: error: available actions are: \(arguments.joined(separator: ", "))")
-} catch CommandError.writeFailed {
-    print("swift-power-assert: error: write failed")
-} catch CommandError.fileExists {
-    print("swift-power-assert: error: file exists")
-} catch CommandError.argumentError(let message) {
-    print("swift-power-assert: error: \(message)")
-} catch CommandError.noUnitTestBundle {
-    print("swift-power-assert: error: no unit test bundle")
-} catch CommandError.buildFailed {
-    print("swift-power-assert: error: xcodebuild command failed")
-} catch CommandError.instrumentFailed {
-    print("swift-power-assert: error: an instrumentation failed")
-} catch CommandError.executionFailed {
-    print("swift-power-assert: error: running XCTest failed")
+} catch SwiftPowerAssertError.invalidArgument(let description) {
+    print("swift-power-assert: error: \(description)")
+} catch SwiftPowerAssertError.noUnitTestBundle {
+    print("swift-power-assert: error: no unit test bundle found")
+} catch SwiftPowerAssertError.buildFailed(let description) {
+    print("swift-power-assert: error: \(description)")
+} catch SwiftPowerAssertError.taskError(let description) {
+    print("swift-power-assert: error: \(description)")
+} catch SwiftPowerAssertError.writeFailed(let description, let error) {
+    print("swift-power-assert: error: \(description): \(error.localizedDescription)")
+} catch SwiftPowerAssertError.internalError(let description, let error) {
+    print("swift-power-assert: error: \(description): \(error.localizedDescription)")
 }
 exit(1)
