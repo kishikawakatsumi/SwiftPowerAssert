@@ -1531,4 +1531,39 @@ class AssertTests: XCTestCase {
         let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
+
+    func testMultipleStatementInClosure() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let a = 5
+                    let b = 10
+
+                    assert(
+                        { (a: Int, b: Int) -> Bool in
+                            let c = a + b
+                            let d = a - b
+                            if c != d {
+                                _ = c.distance(to: d)
+                                _ = d.distance(to: c)
+                            }
+                            return c == d
+                        }(a, b)
+                    )
+                }
+            }
+            """
+
+        let expected = """
+            assert( { (a: Int, b: Int) -> Bool in let c = a + b;let d = a - b;if c != d { _ = c.distance(to: d);_ = d.distance(to: c) };return c == d }(a, b) )
+                    |                                                                                                                                   |  |
+                    false                                                                                                                               5  10
+
+            """
+
+        let result = TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
 }
