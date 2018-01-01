@@ -27,14 +27,14 @@ public struct BuildOptions {
     public let arch: String
     public let deploymentTarget: String
     public let dependencies: [URL]
-    public let buildDirectory: String
+    public let builtProductsDirectory: String
 
     public var targetTriple: String {
         let triple = Triple(arch: arch, vendor: "apple", os: platformTargetPrefix, deploymentVersion: deploymentTarget, environment: nil)
         return triple.description
     }
 
-    public init(sdkName: String, sdkRoot: String, platformName: String, platformTargetPrefix: String, arch: String, deploymentTarget: String, dependencies: [URL], buildDirectory: String) {
+    public init(sdkName: String, sdkRoot: String, platformName: String, platformTargetPrefix: String, arch: String, deploymentTarget: String, dependencies: [URL], builtProductsDirectory: String) {
         self.sdkName = sdkName
         self.sdkRoot = sdkRoot
         self.platformName = platformName
@@ -42,7 +42,7 @@ public struct BuildOptions {
         self.arch = arch
         self.deploymentTarget = deploymentTarget
         self.dependencies = dependencies
-        self.buildDirectory = buildDirectory
+        self.builtProductsDirectory = builtProductsDirectory
     }
 }
 

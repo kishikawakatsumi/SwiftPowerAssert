@@ -31,7 +31,79 @@ public final class SwiftPowerAssert {
     }
 
     public func processFile(input: URL, verbose: Bool = false) throws -> String {
-        let transformer = Transformer(target: buildOptions.targetTriple, sdkRoot: buildOptions.sdkRoot)
-        return try transformer.transform(sourceFile: input, dependencies: buildOptions.dependencies, buildDirectory: buildOptions.buildDirectory, verbose: verbose)
+        return try transform(sourceFile: input, verbose: verbose)
+    }
+
+    func transform(sourceFile: URL, verbose: Bool = false) throws -> String {
+        let arguments = buildArguments(source: sourceFile)
+        let rawAST = try dumpAST(arguments: arguments)
+        let tokens = tokenize(rawAST: rawAST)
+        let node = lex(tokens: tokens)
+        let root = parse(node: node)
+
+        let sourceText = try String(contentsOf: sourceFile)
+        let transformed = instrument(source: sourceText, root: root, verbose: verbose)
+
+        return transformed
+    }
+
+    private func buildArguments(source: URL) -> [String] {
+        let arguments = [
+            "/usr/bin/xcrun",
+            "swift",
+            "-frontend",
+            "-target",
+            buildOptions.targetTriple,
+            "-sdk",
+            buildOptions.sdkRoot,
+            "-F",
+            "\(buildOptions.sdkRoot)/../../../Developer/Library/Frameworks",
+            "-F",
+            buildOptions.builtProductsDirectory,
+            "-dump-ast"
+        ]
+        return arguments + ["-primary-file", source.path] + buildOptions.dependencies.filter { $0 != source }.map { $0.path }
+    }
+
+    private func dumpAST(arguments: [String]) throws -> String {
+        let process = Process(arguments: arguments)
+        try process.launch()
+        let result = try process.waitUntilExit()
+        let output = try result.utf8stderrOutput()
+        if case .terminated(let code) = result.exitStatus, code != 0 {
+            throw SwiftPowerAsserrError.buildFailed(output)
+        }
+        return output
+    }
+
+    private func tokenize(rawAST: String) -> [Token] {
+        var lines = [String]()
+        rawAST.enumerateLines { (line, stop) in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("(normal_conformance") || trimmed.hasPrefix("(abstract_conformance") ||
+                trimmed.hasPrefix("(specialized_conformance") || trimmed.hasPrefix("(assoc_type") ||
+                trimmed.hasPrefix("(value req") || !trimmed.hasPrefix("(") {
+                return
+            }
+            lines.append(line)
+        }
+
+        let tokenizer = Tokenizer()
+        return tokenizer.tokenize(source: lines.joined(separator: "\n"))
+    }
+
+    private func lex(tokens: [Token]) -> Node<[Token]> {
+        let lexer = Lexer()
+        return lexer.lex(tokens: tokens)
+    }
+
+    private func parse(node: Node<[Token]>) -> AST {
+        let parser = Parser()
+        return parser.parse(root: node)
+    }
+
+    private func instrument(source: String, root: AST, verbose: Bool = false) -> String {
+        let instrumentor = Instrumentor(source: source, verbose: verbose)
+        return instrumentor.instrument(node: root)
     }
 }

@@ -96,42 +96,35 @@ class Parser {
 
         for token in tokens {
             switch (token.type, token.value) {
-            case (.string, _):
-                name = token.value
+            case (.string, let value):
+                name = value
             default:
                 break
             }
         }
-
-        var parameters = [Parameter]()
-        var result: FunctionResult? = nil
-        var body = [Statement]()
-        for node in node.children {
-            for token in node.value {
+        if name == nil {
+            for token in tokens {
                 switch (token.type, token.value) {
-                case (.token, "parameter_list"):
-                    parameters.append(contentsOf: parseParameterListNode(node: node))
-                case (.token, "result"):
-                    result = parseResultNode(node: node)
-                case (.token, "brace_stmt"):
-                    body.append(.expression(parseExpressionNode(node: node)))
+                case (.symbol, let value):
+                    name = value
                 default:
                     break
                 }
             }
         }
 
-        var throwsModifier: String?
-        for token in tokens {
-            switch (token.type, token.value) {
-            case (.token, "nothrow"):
-                throwsModifier = "nothrow"
-            case (.token, "throws"):
-                throwsModifier = "throws"
-            case (.token, "rethrows"):
-                throwsModifier = "rethrows"
-            default:
-                break
+        var parameters = [Parameter]()
+        var body = [Statement]()
+        for node in node.children {
+            for token in node.value {
+                switch (token.type, token.value) {
+                case (.token, "parameter_list"):
+                    parameters.append(contentsOf: parseParameterListNode(node: node))
+                case (.token, "brace_stmt"):
+                    body.append(.expression(parseExpressionNode(node: node)))
+                default:
+                    break
+                }
             }
         }
 
@@ -143,7 +136,7 @@ class Parser {
             accessLevel = "internal"
         }
 
-        return FunctionDeclaration(accessLevel: accessLevel, name: name, parameters: parameters, throwBehavior: throwsModifier, result: result, body: body)
+        return FunctionDeclaration(accessLevel: accessLevel, name: name, parameters: parameters, body: body)
     }
 
     private func parseExpressionNode(node: Node<[Token]>) -> Expression {
@@ -250,10 +243,6 @@ class Parser {
         }
         let type = attributes["type"]!
         return Parameter(externalName: externalName, localName: localName, type: type)
-    }
-
-    private func parseResultNode(node: Node<[Token]>) -> FunctionResult {
-        return FunctionResult(type: parseKeyValueAttributes(tokens: node.child(at: 0).child(at: 0).value)["id"]!)
     }
 
     private func parseKeyValueAttributes(tokens: [Token]) -> [String: String] {

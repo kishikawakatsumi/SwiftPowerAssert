@@ -21,7 +21,13 @@ import Basic
 import SwiftPowerAssertCore
 
 struct TestCommand {
-    func run(xcarguments: [String], verbose: Bool = false) throws {
+    func run(xcarguments arguments: [String], verbose: Bool = false) throws {
+        let xcarguments: [String]
+        if let first = arguments.first, first == "xcodebuild" {
+            xcarguments = Array(arguments.dropFirst())
+        } else {
+            xcarguments = arguments
+        }
         var iterator = xcarguments.enumerated().makeIterator()
         var buildActions = [(Int, String)]()
         var testOnlyOptions = [(Int, String)]()
@@ -73,7 +79,7 @@ struct TestCommand {
         let arch = targetBuildSettings.settings["arch"]!
         let deploymentTargetSettingName = targetBuildSettings.settings["DEPLOYMENT_TARGET_SETTING_NAME"]!
         let deploymentTarget = targetBuildSettings.settings[deploymentTargetSettingName]!
-        let buildDirectory = targetBuildSettings.settings["BUILT_PRODUCTS_DIR"]!
+        let builtProductsDirectory = targetBuildSettings.settings["BUILT_PRODUCTS_DIR"]!
 
         var backupFiles = [String: TemporaryFile]()
         let temporaryDirectory = try! TemporaryDirectory(prefix: "com.kishikawakatsumi.swift-power-assert", removeTreeOnDeinit: true)
@@ -81,7 +87,7 @@ struct TestCommand {
         for source in sources {
             var isDirectory: ObjCBool = false
             if FileManager.default.fileExists(atPath: source.path, isDirectory: &isDirectory) && !isDirectory.boolValue {
-                let temporaryFile = try! TemporaryFile(dir: temporaryDirectory.path, suffix: source.lastPathComponent)
+                let temporaryFile = try! TemporaryFile(dir: temporaryDirectory.path, prefix: "Backup", suffix: source.lastPathComponent)
                 try! FileManager.default.removeItem(atPath: temporaryFile.path.asString)
                 try! FileManager.default.copyItem(atPath: source.path, toPath: temporaryFile.path.asString)
                 backupFiles[source.path] = temporaryFile
@@ -90,7 +96,7 @@ struct TestCommand {
                 let options = BuildOptions(sdkName: sdkName, sdkRoot: sdkRoot,
                                            platformName: platformName, platformTargetPrefix: platformTargetPrefix,
                                            arch: arch, deploymentTarget: deploymentTarget,
-                                           dependencies: dependencies, buildDirectory: buildDirectory)
+                                           dependencies: dependencies, builtProductsDirectory: builtProductsDirectory)
                 let processor = SwiftPowerAssert(buildOptions: options)
                 do {
                     let transformed = try processor.processFile(input: source, verbose: verbose)
