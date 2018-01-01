@@ -1500,4 +1500,70 @@ class AssertTests: XCTestCase {
         let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
+
+    func testExplicitMemberExpression() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let arr = [1, 2, 3]
+                    assert(
+                        [10, 3, 20, 15, 4]
+                            .sorted()
+                            .filter { $0 > 5 }
+                            .map { $0 * 100 } == arr
+                    )
+                }
+            }
+
+            """
+
+        let expected = """
+            assert( [10, 3, 20, 15, 4] .sorted() .filter { $0 > 5 } .map { $0 * 100 } == arr )
+                    ||   |  |   |   |   |         |                  |                |  |
+                    |10  3  20  15  4   |         [10, 15, 20]       |                |  [1, 2, 3]
+                    [10, 3, 20, 15, 4]  [3, 4, 10, 15, 20]           |                false
+                                                                     [1000, 1500, 2000]
+
+            """
+
+        let result = TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
+    func testMultipleStatementInClosure() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let a = 5
+                    let b = 10
+
+                    assert(
+                        { (a: Int, b: Int) -> Bool in
+                            let c = a + b
+                            let d = a - b
+                            if c != d {
+                                _ = c.distance(to: d)
+                                _ = d.distance(to: c)
+                            }
+                            return c == d
+                        }(a, b)
+                    )
+                }
+            }
+            """
+
+        let expected = """
+            assert( { (a: Int, b: Int) -> Bool in let c = a + b;let d = a - b;if c != d { _ = c.distance(to: d);_ = d.distance(to: c) };return c == d }(a, b) )
+                    |                                                                                                                                   |  |
+                    false                                                                                                                               5  10
+
+            """
+
+        let result = TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
 }

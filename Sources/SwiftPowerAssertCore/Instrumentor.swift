@@ -53,8 +53,8 @@ class Instrumentor {
                             declaration.body.forEach {
                                 switch $0 {
                                 case .expression(let expression):
-                                    traverse(expression) {
-                                        if $0.rawValue == "call_expr", !$0.expressions.isEmpty, let decl = $0.expressions[0].decl {
+                                    traverse(expression) { (expression, _) in
+                                        if expression.rawValue == "call_expr", !expression.expressions.isEmpty, let decl = expression.expressions[0].decl {
                                             switch decl {
                                             case "Swift.(file).assert(_:_:file:line:)",
                                                  "XCTest.(file).XCTAssert(_:_:file:line:)",
@@ -66,7 +66,7 @@ class Instrumentor {
                                                  "XCTest.(file).XCTAssertGreaterThanOrEqual(_:_:_:file:line:)",
                                                  "XCTest.(file).XCTAssertLessThanOrEqual(_:_:_:file:line:)",
                                                  "XCTest.(file).XCTAssertLessThan(_:_:_:file:line:)":
-                                                expressions.append($0)
+                                                expressions.append(expression)
                                             default:
                                                 break
                                             }
@@ -170,7 +170,7 @@ class Instrumentor {
         var values = [Int: String]()
         let formatter = Formatter()
 
-        traverse(expression) { (childExpression) in
+        traverse(expression) { (childExpression, skip) in
             guard let wholeRange = expression.range, let valueRange = childExpression.range, wholeRange != valueRange else {
                 return
             }
@@ -180,6 +180,9 @@ class Instrumentor {
             if (childExpression.rawValue == "declref_expr" && !childExpression.type.contains("->")) ||
                 childExpression.rawValue == "magic_identifier_literal_expr" {
                 let source = completeExpressionSource(childExpression, expression)
+                if source.hasPrefix("$") {
+                    return
+                }
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
 
                 let column = columnInFunctionCall(column: valueRange.end.column, startLine: valueRange.start.line, endLine: valueRange.end.line, tokens: tokens, child: childExpression, parent: expression)
@@ -240,12 +243,13 @@ class Instrumentor {
 
                 let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
 
+                let formatted = formatter.format(tokens: formatter.tokenize(source: source), withHint: childExpression)
                 if !childExpression.expressions.isEmpty && childExpression.throwsModifier == "throws" {
-                    values[column] = "try! " + formatter.format(tokens: formatter.tokenize(source: source))
+                    values[column] = "try! " + formatted
                 } else if childExpression.argumentLabels == "nilLiteral:" {
-                    values[column] = formatter.format(tokens: formatter.tokenize(source: source)) + " as \(childExpression.type!)"
+                    values[column] = formatted + " as \(childExpression.type!)"
                 } else {
-                    values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+                    values[column] = formatted
                 }
             }
             if childExpression.rawValue == "binary_expr" {
@@ -253,9 +257,9 @@ class Instrumentor {
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
 
                 var containsThrowsFunction = false
-                traverse(childExpression) {
+                traverse(childExpression) { (expression, skip) in
                     guard !containsThrowsFunction else { return }
-                    containsThrowsFunction = $0.rawValue == "call_expr" && $0.throwsModifier == "throws"
+                    containsThrowsFunction = expression.rawValue == "call_expr" && expression.throwsModifier == "throws"
                 }
 
                 let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
@@ -267,6 +271,10 @@ class Instrumentor {
 
                 let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
                 values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+            }
+            if childExpression.rawValue == "closure_expr" {
+                skip = true
+                return
             }
         }
 
@@ -283,11 +291,12 @@ class Instrumentor {
 
     private func instrument(expression: Expression, with values: [Int: String], failureCondition: Bool = false) -> String {
         let expressionSource = source(from: expression.range)
-        let tupleExpressionSource = source(from: expression.expressions[1].range)
+        let tupleExpression = expression.expressions[1]
+        let tupleExpressionSource = source(from: tupleExpression.range)
         let formatter = Formatter()
         let recordValues = recordValuesCodeFragment(values: values)
-        let condition = formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource))
-        let assertion = formatter.escaped(tokens: formatter.tokenize(source: expressionSource))
+        let condition = formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource), withHint: tupleExpression)
+        let assertion = formatter.escaped(tokens: formatter.tokenize(source: expressionSource), withHint: tupleExpression)
         return instrument(expression: expression, recordValues: recordValues, condition: condition, assertion: assertion, failureCondition: failureCondition)
     }
 
@@ -296,28 +305,30 @@ class Instrumentor {
         let tupleExpressionSource = source(from: tupleExpression.range)
         let formatter = Formatter()
         let recordValues = recordValuesCodeFragment(values: values)
-        let condition = "__Util.equal(\(formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource))))"
-        let assertion = formatter.escaped(tokens: formatter.tokenize(source: expressionSource))
+        let condition = "__Util.equal(\(formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource), withHint: tupleExpression)))"
+        let assertion = formatter.escaped(tokens: formatter.tokenize(source: expressionSource), withHint: tupleExpression)
         return instrument(expression: expression, recordValues: recordValues, condition: condition, assertion: assertion, failureCondition: failureCondition)
     }
 
     private func instrument(greaterThan expression: Expression, tupleExpression: Expression, values: [Int: String], failureCondition: Bool = false) -> String {
         let expressionSource = source(from: expression.range)
-        let tupleExpressionSource = source(from: expression.expressions[1].range)
+        let tupleExpression = expression.expressions[1]
+        let tupleExpressionSource = source(from: tupleExpression.range)
         let formatter = Formatter()
         let recordValues = recordValuesCodeFragment(values: values)
-        let condition = "__Util.greaterThan(\(formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource))))"
-        let assertion = formatter.escaped(tokens: formatter.tokenize(source: expressionSource))
+        let condition = "__Util.greaterThan(\(formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource), withHint: tupleExpression)))"
+        let assertion = formatter.escaped(tokens: formatter.tokenize(source: expressionSource), withHint: tupleExpression)
         return instrument(expression: expression, recordValues: recordValues, condition: condition, assertion: assertion, failureCondition: failureCondition)
     }
 
     private func instrument(greaterThanOrEqual expression: Expression, tupleExpression: Expression, values: [Int: String], failureCondition: Bool = false) -> String {
         let expressionSource = source(from: expression.range)
-        let tupleExpressionSource = source(from: expression.expressions[1].range)
+        let tupleExpression = expression.expressions[1]
+        let tupleExpressionSource = source(from: tupleExpression.range)
         let formatter = Formatter()
         let recordValues = recordValuesCodeFragment(values: values)
-        let condition = "__Util.greaterThanOrEqual(\(formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource))))"
-        let assertion = formatter.escaped(tokens: formatter.tokenize(source: expressionSource))
+        let condition = "__Util.greaterThanOrEqual(\(formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource), withHint: tupleExpression)))"
+        let assertion = formatter.escaped(tokens: formatter.tokenize(source: expressionSource), withHint: tupleExpression)
         return instrument(expression: expression, recordValues: recordValues, condition: condition, assertion: assertion, failureCondition: failureCondition)
     }
 
@@ -510,8 +521,12 @@ class Instrumentor {
         return nil
     }
 
-    private func traverse(_ expression: Expression, closure: (_ expression: Expression) -> ()) {
-        closure(expression)
+    private func traverse(_ expression: Expression, closure: (_ expression: Expression, _ skipChildren: inout Bool) -> ()) {
+        var skip = false
+        closure(expression, &skip)
+        if skip {
+            return
+        }
         for expression in expression.expressions {
             traverse(expression, closure: closure)
         }
@@ -779,6 +794,36 @@ class Instrumentor {
             return formatted
         }
 
+        func format(tokens: [Token], withHint expression: Expression) -> String {
+            let range = expression.range
+            var line = range!.start.line
+            var column = range!.start.column
+
+            var formatted = ""
+            for (index, token) in tokens.enumerated() {
+                switch token.type {
+                case .token:
+                    formatted += token.value
+                    column += token.value.utf8.count
+                case .string:
+                    let string = "\"" + token.value + "\""
+                    formatted += string
+                    column += string.utf8.count
+                case .indent(let count):
+                    column += count
+                case .newline:
+                    let needed = isSemicolonNeeded(line: line, column: column, expression: expression)
+                    let required = isSemicolonRequired(startIndex: index, tokens: tokens)
+                    let canAppend = canAppendSemicolon(startIndex: index, tokens: tokens)
+                    let isAbleToAppend = isAbleToAppendSemicolon(startIndex: index, tokens: tokens, line: line, column: column, expression: expression)
+                    formatted += (needed || required) && canAppend && isAbleToAppend ? ";" : " "
+                    column = 0
+                    line += 1
+                }
+            }
+            return formatted
+        }
+
         func escaped(tokens: [Token]) -> String {
             var formatted = ""
             for token in tokens {
@@ -794,6 +839,143 @@ class Instrumentor {
                 }
             }
             return formatted
+        }
+
+        func escaped(tokens: [Token], withHint expression: Expression) -> String {
+            let range = expression.range
+            var line = range!.start.line
+            var column = range!.start.column
+
+            var formatted = ""
+            for (index, token) in tokens.enumerated() {
+                switch token.type {
+                case .token:
+                    let value = token.value
+                    formatted += value.replacingOccurrences(of: "\\", with: "\\\\")
+                    column += value.utf8.count
+                case .string:
+                    formatted += "\\\"" + token.value.replacingOccurrences(of: "\"", with: "\\\\\"") + "\\\""
+                    column += token.value.utf8.count + 2
+                case .indent(let count):
+                    column += count
+                case .newline:
+                    let needed = isSemicolonNeeded(line: line, column: column, expression: expression)
+                    let required = isSemicolonRequired(startIndex: index, tokens: tokens)
+                    let canAppend = canAppendSemicolon(startIndex: index, tokens: tokens)
+                    let isAbleToAppend = isAbleToAppendSemicolon(startIndex: index, tokens: tokens, line: line, column: column, expression: expression)
+                    formatted += (needed || required) && canAppend && isAbleToAppend ? ";" : " "
+                    column = 0
+                    line += 1
+                }
+            }
+            return formatted
+        }
+
+        private func traverse(_ expression: Expression, closure: (_ expression: Expression, _ skipChildren: inout Bool) -> ()) {
+            var skip = false
+            closure(expression, &skip)
+            if skip {
+                return
+            }
+            for expression in expression.expressions {
+                traverse(expression, closure: closure)
+            }
+        }
+
+        private func isSemicolonNeeded(line: Int, column: Int, expression: Expression) -> Bool {
+            var semicolonNeeded = false
+            traverse(expression) { (expression, skip) in
+                guard let range = expression.range else {
+                    return
+                }
+                if (expression.rawValue == "binary_expr" || expression.rawValue == "erasure_expr" || expression.rawValue == "call_expr" ||
+                    expression.rawValue == "tuple_expr" || expression.rawValue == "tuple_shuffle_expr" || expression.rawValue == "paren_expr") &&
+                    line == range.end.line && column == range.end.column {
+                    skip = true
+                    semicolonNeeded = true
+                    return
+                }
+            }
+            return semicolonNeeded
+        }
+
+        private func isSemicolonRequired(startIndex index: Int, tokens: [Instrumentor.Formatter.Token]) -> Bool {
+            var i = index
+            while index >= 0 {
+                let token = tokens[i]
+                switch token.type {
+                case .token:
+                    switch token.value {
+                    case "}":
+                        return true
+                    default:
+                        return false
+                    }
+                case .indent(_), .newline:
+                    break
+                case .string:
+                    return false
+                }
+                i -= 1
+            }
+            return false
+        }
+
+        private func canAppendSemicolon(startIndex index: Int, tokens: [Instrumentor.Formatter.Token]) -> Bool {
+            loop: for i in index..<tokens.count {
+                let token = tokens[i]
+                switch token.type {
+                case .token:
+                    switch token.value {
+                    case "(", ")", "[", "]", "{", "}", ",", ".", ":", ";":
+                        return false
+                    default:
+                        break loop
+                    }
+                case .indent(_), .newline:
+                    break
+                default:
+                    break loop
+                }
+            }
+            return true
+        }
+
+        private func isAbleToAppendSemicolon(startIndex index: Int, tokens: [Instrumentor.Formatter.Token], line l: Int, column c: Int, expression: Expression) -> Bool {
+            var line = l
+            var column = c
+
+            loop: for i in index..<tokens.count {
+                let token = tokens[i]
+                switch token.type {
+                case .token:
+                    column += 1
+                    break loop
+                case .string:
+                    column += 1
+                    break loop
+                case .indent(let count):
+                    column += count
+                case .newline:
+                    column = 0
+                    line += 1
+                }
+            }
+
+            var isAbleToAppendSemicolon = true
+            traverse(expression) { (expression, skip) in
+                guard let location = expression.location else {
+                    return
+                }
+                if (expression.rawValue == "binary_expr") {
+                    if line == location.line && column == location.column {
+                        skip = true
+                        isAbleToAppendSemicolon = false
+                        return
+                    }
+                }
+            }
+            return isAbleToAppendSemicolon
         }
 
         class Token {
