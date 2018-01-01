@@ -152,11 +152,8 @@ class Parser {
         }
         let rawRange = attributes["range"]
         var sourceRange: SourceRange?
-        var source: String?
         if let rawRange = rawRange {
-            let (s, r) = parseRange(rawRange)
-            sourceRange = r
-            source = s
+            sourceRange = parseRange(rawRange)
         }
         let decl = attributes["decl"]
         let value = attributes["value"]
@@ -175,8 +172,7 @@ class Parser {
             }
         }
         var expression = Expression(rawValue: rawValue, type: type, rawLocation: rawLocation, rawRange: rawRange,
-                                    location: location, range: sourceRange, source: source,
-                                    decl: decl, value: value, throwsModifier: throwsModifier,
+                                    location: location, range: sourceRange, decl: decl, value: value, throwsModifier: throwsModifier,
                                     argumentLabels: argumentLabels, expressions: [])
 
         for node in node.children {
@@ -195,37 +191,15 @@ class Parser {
         return SourceLocation(line: line, column: column)
     }
 
-    private func parseRange(_ rangeAttribute: String) -> (String, SourceRange) {
+    private func parseRange(_ rangeAttribute: String) -> SourceRange {
         let info = rangeAttribute
             .replacingOccurrences(of: "[", with: "")
             .replacingOccurrences(of: "", with: "")
             .replacingOccurrences(of: " - line", with: "")
             .split(separator: ":")
-        let path = info[0]
         let start = SourceLocation(line: Int(info[1])! - 1, column: Int(info[2])! - 1)
         let end = SourceLocation(line: Int(info[3])! - 1, column: Int(info[4])!)
-        let source = try! String(contentsOfFile: String(path))
-        var lines = [String]()
-        source.enumerateLines { (line, stop) in
-            lines.append(line)
-        }
-        var text = ""
-        for index in start.line...end.line {
-            let line = lines[index]
-            let utf8 = line.utf8
-            if start.line == end.line {
-                text += String(utf8[utf8.index(utf8.startIndex, offsetBy: start.column)..<utf8.index(utf8.startIndex, offsetBy: end.column)])!
-            } else {
-                if index == start.line {
-                    text += String(utf8[utf8.index(utf8.startIndex, offsetBy: start.column)...])!
-                } else if index == end.line {
-                    text += "\n" + String(utf8[utf8.startIndex..<utf8.index(utf8.startIndex, offsetBy: end.column)])!
-                } else {
-                    text += "\n" + line
-                }
-            }
-        }
-        return (text, SourceRange(start: start, end: end))
+        return SourceRange(start: start, end: end)
     }
 
     private func parseParameterListNode(node: Node<[Token]>) -> [Parameter] {

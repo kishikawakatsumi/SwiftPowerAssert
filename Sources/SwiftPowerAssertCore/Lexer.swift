@@ -76,10 +76,6 @@ class Node<T> {
         self.value = value
     }
 
-    func child(at index: Int) -> Node<T> {
-        return children[index]
-    }
-
     func append(_ child: Node) {
         children.append(child)
         child.parent = self

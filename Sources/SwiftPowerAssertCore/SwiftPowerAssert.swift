@@ -30,20 +30,21 @@ public final class SwiftPowerAssert {
         return try transform(sourceFile: input, verbose: verbose)
     }
 
-    func transform(sourceFile: URL, verbose: Bool = false) throws -> String {
+    private func transform(sourceFile: URL, verbose: Bool = false) throws -> String {
+        let sourceText: String
+        do {
+            sourceText = try String(contentsOf: sourceFile)
+        } catch {
+            throw SwiftPowerAssertError.internalError("failed to read source file from: \(sourceFile)", error)
+        }
+
         let arguments = buildArguments(source: sourceFile)
         let rawAST = try dumpAST(arguments: arguments)
         let tokens = tokenize(rawAST: rawAST)
         let node = lex(tokens: tokens)
         let root = parse(node: node)
-
-        do {
-            let sourceText = try String(contentsOf: sourceFile)
-            let transformed = instrument(source: sourceText, root: root, verbose: verbose)
-            return transformed
-        } catch {
-            throw SwiftPowerAssertError.internalError("failed to read source file from: \(sourceFile)", error)
-        }
+        let transformed = instrument(source: sourceText, root: root, verbose: verbose)
+        return transformed
     }
 
     private func buildArguments(source: URL) -> [String] {

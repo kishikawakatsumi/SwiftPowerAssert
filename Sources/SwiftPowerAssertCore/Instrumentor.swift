@@ -163,7 +163,7 @@ class Instrumentor {
                 break
             }
         }
-        return expression.source
+        return source(from: expression.range)
     }
 
     private func recordValues(_ expression: Expression) -> [Int: String] {
@@ -171,18 +171,18 @@ class Instrumentor {
         let formatter = Formatter()
 
         traverse(expression) { (childExpression) in
-            guard let source = childExpression.source,
-                source != expression.source &&
-                (childExpression.range.start.line != expression.range.start.line || childExpression.range.start.column != expression.range.start.column) else {
-                    return
+            guard let wholeRange = expression.range, let valueRange = childExpression.range, wholeRange != valueRange else {
+                return
             }
+            let wholeExpressionSource = source(from: wholeRange)
+            let valueExpressionSource = source(from: valueRange)
 
             if (childExpression.rawValue == "declref_expr" && !childExpression.type.contains("->")) ||
                 childExpression.rawValue == "magic_identifier_literal_expr" {
                 let source = completeExpressionSource(childExpression, expression)
-                let tokens = formatter.tokenize(source: expression.source)
+                let tokens = formatter.tokenize(source: wholeExpressionSource)
 
-                let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
+                let column = columnInFunctionCall(column: valueRange.end.column, startLine: valueRange.start.line, endLine: valueRange.end.line, tokens: tokens, child: childExpression, parent: expression)
                 switch source {
                 case "#column":
                     values[column] = "\(childExpression.location.column)"
@@ -194,9 +194,9 @@ class Instrumentor {
             }
             if childExpression.rawValue == "member_ref_expr" ||  childExpression.rawValue == "dot_self_expr" {
                 let source = completeExpressionSource(childExpression, expression)
-                let tokens = formatter.tokenize(source: expression.source)
+                let tokens = formatter.tokenize(source: wholeExpressionSource)
 
-                let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
+                let column = columnInFunctionCall(column: valueRange.end.column, startLine: valueRange.start.line, endLine: valueRange.end.line, tokens: tokens, child: childExpression, parent: expression)
 
                 if source.hasPrefix(".") {
                     values[column] = childExpression.type.replacingOccurrences(of: "@lvalue ", with: "") + formatter.format(tokens: formatter.tokenize(source: source))
@@ -206,36 +206,36 @@ class Instrumentor {
             }
             if childExpression.rawValue == "tuple_element_expr" || childExpression.rawValue == "keypath_expr" {
                 let source = completeExpressionSource(childExpression, expression)
-                let tokens = formatter.tokenize(source: expression.source)
+                let tokens = formatter.tokenize(source: wholeExpressionSource)
 
-                let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
+                let column = columnInFunctionCall(column: valueRange.end.column, startLine: valueRange.start.line, endLine: valueRange.end.line, tokens: tokens, child: childExpression, parent: expression)
                 values[column] = formatter.format(tokens: formatter.tokenize(source: source)) + " as \(childExpression.type!)"
             }
             if childExpression.rawValue == "string_literal_expr" {
                 let source = stringLiteralExpression(childExpression, expression)
-                let tokens = formatter.tokenize(source: expression.source)
+                let tokens = formatter.tokenize(source: wholeExpressionSource)
 
-                let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
+                let column = columnInFunctionCall(column: valueRange.end.column, startLine: valueRange.start.line, endLine: valueRange.end.line, tokens: tokens, child: childExpression, parent: expression)
                 values[column] = formatter.format(tokens: formatter.tokenize(source: source))
             }
             if childExpression.rawValue == "array_expr" || childExpression.rawValue == "dictionary_expr" ||
                 childExpression.rawValue == "object_literal" {
-                let source: String = childExpression.source
-                let tokens = formatter.tokenize(source: expression.source)
+                let source = valueExpressionSource
+                let tokens = formatter.tokenize(source: wholeExpressionSource)
 
                 let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
                 values[column] = formatter.format(tokens: formatter.tokenize(source: source)) + " as \(childExpression.type!)"
             }
             if childExpression.rawValue == "subscript_expr" || childExpression.rawValue == "keypath_application_expr" {
-                let source: String = childExpression.source
-                let tokens = formatter.tokenize(source: expression.source)
+                let source = valueExpressionSource
+                let tokens = formatter.tokenize(source: wholeExpressionSource)
 
-                let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
+                let column = columnInFunctionCall(column: valueRange.end.column, startLine: valueRange.start.line, endLine: valueRange.end.line, tokens: tokens, child: childExpression, parent: expression)
                 values[column] = formatter.format(tokens: formatter.tokenize(source: source))
             }
             if childExpression.rawValue == "call_expr" {
                 let source = completeExpressionSource(childExpression, expression)
-                let tokens = formatter.tokenize(source: expression.source)
+                let tokens = formatter.tokenize(source: wholeExpressionSource)
 
                 let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
 
@@ -249,7 +249,7 @@ class Instrumentor {
             }
             if childExpression.rawValue == "binary_expr" {
                 let source = completeExpressionSource(childExpression, expression)
-                let tokens = formatter.tokenize(source: expression.source)
+                let tokens = formatter.tokenize(source: wholeExpressionSource)
 
                 var containsThrowsFunction = false
                 traverse(childExpression) {
@@ -262,7 +262,7 @@ class Instrumentor {
             }
             if childExpression.rawValue == "if_expr" {
                 let source = completeExpressionSource(childExpression, expression)
-                let tokens = formatter.tokenize(source: expression.source)
+                let tokens = formatter.tokenize(source: wholeExpressionSource)
 
                 let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
                 values[column] = formatter.format(tokens: formatter.tokenize(source: source))
@@ -281,34 +281,42 @@ class Instrumentor {
     }
 
     private func instrument(expression: Expression, with values: [Int: String], failureCondition: Bool = false) -> String {
+        let expressionSource = source(from: expression.range)
+        let tupleExpressionSource = source(from: expression.expressions[1].range)
         let formatter = Formatter()
         let recordValues = recordValuesCodeFragment(values: values)
-        let condition = formatter.format(tokens: formatter.tokenize(source: expression.expressions[1].source))
-        let assertion = formatter.escaped(tokens: formatter.tokenize(source: expression.source))
+        let condition = formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource))
+        let assertion = formatter.escaped(tokens: formatter.tokenize(source: expressionSource))
         return instrument(expression: expression, recordValues: recordValues, condition: condition, assertion: assertion, failureCondition: failureCondition)
     }
 
     private func instrument(equality expression: Expression, tupleExpression: Expression, values: [Int: String], failureCondition: Bool = false) -> String {
+        let expressionSource = source(from: expression.range)
+        let tupleExpressionSource = source(from: tupleExpression.range)
         let formatter = Formatter()
         let recordValues = recordValuesCodeFragment(values: values)
-        let condition = "__Util.equal(\(formatter.format(tokens: formatter.tokenize(source: tupleExpression.source))))"
-        let assertion = formatter.escaped(tokens: formatter.tokenize(source: expression.source))
+        let condition = "__Util.equal(\(formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource))))"
+        let assertion = formatter.escaped(tokens: formatter.tokenize(source: expressionSource))
         return instrument(expression: expression, recordValues: recordValues, condition: condition, assertion: assertion, failureCondition: failureCondition)
     }
 
     private func instrument(greaterThan expression: Expression, tupleExpression: Expression, values: [Int: String], failureCondition: Bool = false) -> String {
+        let expressionSource = source(from: expression.range)
+        let tupleExpressionSource = source(from: expression.expressions[1].range)
         let formatter = Formatter()
         let recordValues = recordValuesCodeFragment(values: values)
-        let condition = "__Util.greaterThan(\(formatter.format(tokens: formatter.tokenize(source: tupleExpression.source))))"
-        let assertion = formatter.escaped(tokens: formatter.tokenize(source: expression.source))
+        let condition = "__Util.greaterThan(\(formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource))))"
+        let assertion = formatter.escaped(tokens: formatter.tokenize(source: expressionSource))
         return instrument(expression: expression, recordValues: recordValues, condition: condition, assertion: assertion, failureCondition: failureCondition)
     }
 
     private func instrument(greaterThanOrEqual expression: Expression, tupleExpression: Expression, values: [Int: String], failureCondition: Bool = false) -> String {
+        let expressionSource = source(from: expression.range)
+        let tupleExpressionSource = source(from: expression.expressions[1].range)
         let formatter = Formatter()
         let recordValues = recordValuesCodeFragment(values: values)
-        let condition = "__Util.greaterThanOrEqual(\(formatter.format(tokens: formatter.tokenize(source: tupleExpression.source))))"
-        let assertion = formatter.escaped(tokens: formatter.tokenize(source: expression.source))
+        let condition = "__Util.greaterThanOrEqual(\(formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource))))"
+        let assertion = formatter.escaped(tokens: formatter.tokenize(source: expressionSource))
         return instrument(expression: expression, recordValues: recordValues, condition: condition, assertion: assertion, failureCondition: failureCondition)
     }
 
@@ -473,7 +481,7 @@ class Instrumentor {
     }
 
     private func stringLiteralExpression(_ child: Expression, _ parent: Expression) -> String {
-        var source: String = child.source
+        var source = self.source(from: child.range)
         let rest = restOfExpression(child, parent)
         var previous = ""
         for character in rest {
@@ -509,7 +517,7 @@ class Instrumentor {
     }
 
     private func completeExpressionSource(_ child: Expression, _ parent: Expression) -> String {
-        let source: String = child.source
+        let source = self.source(from: child.range)
         let rest = restOfExpression(child, parent)
         return extendExpression(rest, source)
     }
@@ -585,10 +593,29 @@ class Instrumentor {
         }
 
         let formatter = Formatter()
-        let whole = formatter.format(tokens: formatter.tokenize(source: parent.source)).utf8
+        let whole = formatter.format(tokens: formatter.tokenize(source: source(from: parent.range))).utf8
         let prefix = whole.prefix(upTo: whole.index(whole.startIndex, offsetBy: columnIndex - indent))
         
         return __DisplayWidth.of(String(prefix)!, inEastAsian: true)
+    }
+
+    private func source(from range: SourceRange) -> String {
+        let utf8 = source.utf8
+        let start = range.start
+        let end = range.end
+        let startIndex: String.Index
+        if start.line > 0 {
+            startIndex = utf8.index(utf8.startIndex, offsetBy: sourceIndices[start.line - 1]! + start.column)
+        } else {
+            startIndex = utf8.index(utf8.startIndex, offsetBy: start.column)
+        }
+        let endIndex: String.Index
+        if end.line > 0 {
+            endIndex = utf8.index(utf8.startIndex, offsetBy: sourceIndices[end.line - 1]! + end.column)
+        } else {
+            endIndex = utf8.index(utf8.startIndex, offsetBy: end.column)
+        }
+        return String(source[startIndex..<endIndex])
     }
 
     class Formatter {
