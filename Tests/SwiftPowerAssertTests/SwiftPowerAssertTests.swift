@@ -114,9 +114,15 @@ private class TestRunner {
         try! process.launch()
 
         let result = try! process.waitUntilExit()
-        if case .terminated(let code) = result.exitStatus, code != 0 {
+        switch result.exitStatus {
+        case .terminated(let code) where code != 0:
             print(try! result.utf8stderrOutput())
-            fatalError("failed to run an instrumented code")
+            fatalError("abort")
+        case .signalled(_):
+            print(try! result.utf8stderrOutput())
+            fatalError("abort")
+        default:
+            break
         }
 
         return try! result.utf8Output()
