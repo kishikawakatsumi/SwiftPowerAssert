@@ -17,119 +17,8 @@
 ////////////////////////////////////////////////////////////////////////////
 
 import XCTest
-import Basic
-import SwiftPowerAssertCore
 
-private class TestRunner {
-    private lazy var temporaryDirectory = {
-        return try! TemporaryDirectory(prefix: "com.kishikawakatsumi.swift-power-assert", removeTreeOnDeinit: true)
-    }()
-    private lazy var temporaryFile = {
-        return try! TemporaryFile(dir: temporaryDirectory.path, prefix: "Tests", suffix: ".swift").path
-    }()
-    private lazy var sourceFilePath = {
-        return temporaryFile.asString
-    }()
-    private lazy var utilitiesFilePath = {
-        return temporaryDirectory.path.appending(component: "Utilities.swift").asString
-    }()
-    private lazy var mainFilePath = {
-        return temporaryDirectory.path.appending(component: "main.swift").asString
-    }()
-    private lazy var executablePath = {
-        return sourceFilePath + ".o"
-    }()
-    private lazy var options: BuildOptions = {
-        let sdk = SDK.macosx
-        let sdkPath = sdk.path()
-        let sdkVersion = sdk.version()
-        return BuildOptions(sdkName: sdk.name + sdkVersion, sdkRoot: sdkPath,
-                            platformName: sdk.name, platformTargetPrefix: sdk.os,
-                            arch: "x86_64", deploymentTarget: sdkVersion,
-                            dependencies: [], buildDirectory: temporaryDirectory.path.asString)
-    }()
-
-    func run(source: String) -> String {
-        prepare(source: source)
-        compile()
-
-        let result = execute()
-        print(result)
-
-        return result
-    }
-
-    private func prepare(source: String) {
-        try! source.write(toFile: sourceFilePath, atomically: true, encoding: .utf8)
-        let processor = SwiftPowerAssert(buildOptions: options)
-        do {
-            let transformed = try processor.processFile(input: URL(fileURLWithPath: sourceFilePath))
-            try! transformed.write(toFile: sourceFilePath, atomically: true, encoding: .utf8)
-        } catch {
-            fatalError("failed to instrument assertions")
-        }
-
-        try! __DisplayWidth.myself.write(toFile: utilitiesFilePath, atomically: true, encoding: .utf8)
-        let main = """
-            Tests().testMethod()
-
-            """
-        try! main.write(toFile: mainFilePath, atomically: true, encoding: .utf8)
-    }
-
-    private func compile() {
-        let arguments = [
-            "/usr/bin/xcrun",
-            "swiftc",
-            "-O",
-            "-whole-module-optimization",
-            sourceFilePath,
-            utilitiesFilePath,
-            mainFilePath,
-            "-o",
-            executablePath,
-            "-target",
-            options.targetTriple,
-            "-sdk",
-            options.sdkRoot,
-            "-F",
-            "\(options.sdkRoot)/../../../Developer/Library/Frameworks",
-            "-Xlinker",
-            "-rpath",
-            "-Xlinker",
-            "\(options.sdkRoot)/../../../Developer/Library/Frameworks",
-        ]
-
-        let process = Process(arguments: arguments)
-        try! process.launch()
-        let result = try! process.waitUntilExit()
-        if case .terminated(let code) = result.exitStatus, code != 0 {
-            print(try! result.utf8stderrOutput())
-            fatalError("failed to compile an instrumented file")
-        }
-    }
-
-    private func execute() -> String {
-        let process = Process(arguments: [executablePath])
-        try! process.launch()
-
-        let result = try! process.waitUntilExit()
-        switch result.exitStatus {
-        case .terminated(let code) where code != 0:
-            print(try! result.utf8stderrOutput())
-            fatalError("abort")
-        case .signalled(_):
-            print(try! result.utf8stderrOutput())
-            fatalError("abort")
-        default:
-            break
-        }
-
-        return try! result.utf8Output()
-    }
-}
-
-class SwiftPowerAssertTests: XCTestCase {
+class AssertTests: XCTestCase {
     func testBinaryExpression1() throws {
         let source = """
             import XCTest
@@ -890,7 +779,7 @@ class SwiftPowerAssertTests: XCTestCase {
         let expected = """
             assert(#file == "*.swift" && #line == 1 && #column == 2 && #function == "function")
                    |     |  |         |  |     |  | |  |       |  | |  |         |  |
-                   |     |  "*.swift" |  81    |  1 |  34      |  2 |  |         |  "function"
+                   |     |  "*.swift" |  5     |  1 |  52      |  2 |  |         |  "function"
                    |     false        false    |    false      |    |  |         false
                    |                           false           |    |  "testMethod()"
                    |                                           |    false
@@ -1531,15 +1420,5 @@ class SwiftPowerAssertTests: XCTestCase {
 
         let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
-    }
-
-    func testDisplayWidth() throws {
-        XCTAssertEqual(__DisplayWidth.of("Katsumi Kishikawa", inEastAsian: true), 17)
-        XCTAssertEqual(__DisplayWidth.of("岸川克己", inEastAsian: true), 8)
-        XCTAssertEqual(__DisplayWidth.of("岸川 克己", inEastAsian: true), 9)
-        XCTAssertEqual(__DisplayWidth.of("岸川克己😇", inEastAsian: true), 10)
-        XCTAssertEqual(__DisplayWidth.of("岸川 克己😇", inEastAsian: true), 11)
-        XCTAssertEqual(__DisplayWidth.of("😇岸川克己🇯🇵", inEastAsian: true), 12)
-        XCTAssertEqual(__DisplayWidth.of("😇岸川 克己🇯🇵", inEastAsian: true), 13)
     }
 }

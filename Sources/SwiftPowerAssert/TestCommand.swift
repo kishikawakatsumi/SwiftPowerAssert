@@ -79,7 +79,7 @@ struct TestCommand {
         let arch = targetBuildSettings.settings["arch"]!
         let deploymentTargetSettingName = targetBuildSettings.settings["DEPLOYMENT_TARGET_SETTING_NAME"]!
         let deploymentTarget = targetBuildSettings.settings[deploymentTargetSettingName]!
-        let buildDirectory = targetBuildSettings.settings["BUILT_PRODUCTS_DIR"]!
+        let builtProductsDirectory = targetBuildSettings.settings["BUILT_PRODUCTS_DIR"]!
 
         var backupFiles = [String: TemporaryFile]()
         let temporaryDirectory = try! TemporaryDirectory(prefix: "com.kishikawakatsumi.swift-power-assert", removeTreeOnDeinit: true)
@@ -96,7 +96,7 @@ struct TestCommand {
                 let options = BuildOptions(sdkName: sdkName, sdkRoot: sdkRoot,
                                            platformName: platformName, platformTargetPrefix: platformTargetPrefix,
                                            arch: arch, deploymentTarget: deploymentTarget,
-                                           dependencies: dependencies, buildDirectory: buildDirectory)
+                                           dependencies: dependencies, builtProductsDirectory: builtProductsDirectory)
                 let processor = SwiftPowerAssert(buildOptions: options)
                 do {
                     let transformed = try processor.processFile(input: source, verbose: verbose)

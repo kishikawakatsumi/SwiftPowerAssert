@@ -57,7 +57,11 @@ class Instrumentor {
                                         if $0.rawValue == "call_expr", !$0.expressions.isEmpty, let decl = $0.expressions[0].decl {
                                             switch decl {
                                             case "Swift.(file).assert(_:_:file:line:)",
-                                                 "XCTest.(file).XCTAssertEqual(_:_:_:file:line:)":
+                                                 "XCTest.(file).XCTAssert(_:_:file:line:)",
+                                                 "XCTest.(file).XCTAssertTrue(_:_:file:line:)",
+                                                 "XCTest.(file).XCTAssertFalse(_:_:file:line:)",
+                                                 "XCTest.(file).XCTAssertEqual(_:_:_:file:line:)",
+                                                 "XCTest.(file).XCTAssertNotEqual(_:_:_:file:line:)":
                                                 expressions.append($0)
                                             default:
                                                 break
@@ -113,13 +117,23 @@ class Instrumentor {
     private func instrument(functionCall expression: Expression) -> String {
         if !expression.expressions.isEmpty, let decl = expression.expressions[0].decl {
             switch decl {
-            case "Swift.(file).assert(_:_:file:line:)":
+            case "Swift.(file).assert(_:_:file:line:)",
+                 "XCTest.(file).XCTAssert(_:_:file:line:)",
+                 "XCTest.(file).XCTAssertTrue(_:_:file:line:)":
                 let values = recordValues(expression)
                 return instrument(expression: expression, with: values)
+            case "XCTest.(file).XCTAssertFalse(_:_:file:line:)":
+                let values = recordValues(expression)
+                return instrument(expression: expression, with: values, failureCondition: true)
             case "XCTest.(file).XCTAssertEqual(_:_:_:file:line:)":
                 if let tupleExpression = findFirst(expression, where: { $0.rawValue == "tuple_expr" }) {
                     let values = recordValues(expression)
                     return instrument(XCTAssertEqual: expression, tupleExpression: tupleExpression, values: values)
+                }
+            case "XCTest.(file).XCTAssertNotEqual(_:_:_:file:line:)":
+                if let tupleExpression = findFirst(expression, where: { $0.rawValue == "tuple_expr" }) {
+                    let values = recordValues(expression)
+                    return instrument(XCTAssertEqual: expression, tupleExpression: tupleExpression, values: values, failureCondition: true)
                 }
             default:
                 break
@@ -145,7 +159,14 @@ class Instrumentor {
                 let tokens = formatter.tokenize(source: expression.source)
 
                 let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
-                values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+                switch source {
+                case "#column":
+                    values[column] = "\(childExpression.location.column)"
+                case "#line":
+                    values[column] = "\(childExpression.location.line + 1)"
+                default:
+                    values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+                }
             }
             if childExpression.rawValue == "member_ref_expr" ||  childExpression.rawValue == "dot_self_expr" {
                 let source = completeExpressionSource(childExpression, expression)
@@ -235,23 +256,23 @@ class Instrumentor {
         return code
     }
 
-    private func instrument(XCTAssertEqual expression: Expression, tupleExpression: Expression, values: [Int: String]) -> String {
-        let formatter = Formatter()
-        let recordValues = recordValuesCodeFragment(values: values)
-        let condition = "__Util.condition(\(formatter.format(tokens: formatter.tokenize(source: tupleExpression.source))))"
-        let assertion = formatter.escaped(tokens: formatter.tokenize(source: expression.source))
-        return instrument(expression: expression, recordValues: recordValues, condition: condition, assertion: assertion)
-    }
-
-    private func instrument(expression: Expression, with values: [Int: String]) -> String {
+    private func instrument(expression: Expression, with values: [Int: String], failureCondition: Bool = false) -> String {
         let formatter = Formatter()
         let recordValues = recordValuesCodeFragment(values: values)
         let condition = formatter.format(tokens: formatter.tokenize(source: expression.expressions[1].source))
         let assertion = formatter.escaped(tokens: formatter.tokenize(source: expression.source))
-        return instrument(expression: expression, recordValues: recordValues, condition: condition, assertion: assertion)
+        return instrument(expression: expression, recordValues: recordValues, condition: condition, assertion: assertion, failureCondition: failureCondition)
     }
 
-    private func instrument(expression: Expression, recordValues: String, condition: String, assertion: String) -> String {
+    private func instrument(XCTAssertEqual expression: Expression, tupleExpression: Expression, values: [Int: String], failureCondition: Bool = false) -> String {
+        let formatter = Formatter()
+        let recordValues = recordValuesCodeFragment(values: values)
+        let condition = "__Util.condition(\(formatter.format(tokens: formatter.tokenize(source: tupleExpression.source))))"
+        let assertion = formatter.escaped(tokens: formatter.tokenize(source: expression.source))
+        return instrument(expression: expression, recordValues: recordValues, condition: condition, assertion: assertion, failureCondition: failureCondition)
+    }
+
+    private func instrument(expression: Expression, recordValues: String, condition: String, assertion: String, failureCondition: Bool = false) -> String {
         let inUnitTests = NSClassFromString("XCTest") != nil
         return """
 
@@ -342,7 +363,7 @@ class Instrumentor {
                 \(recordValues)
                 return \(condition)
             }()
-            if \(verbose) || !condition {
+            if \(verbose) || condition == \(failureCondition) {
                 var message = ""
                 func align(current: inout Int, column: Int, string: String) {
                     while current < column - 1 {
@@ -377,7 +398,7 @@ class Instrumentor {
                     print(message, terminator: "")
                 } else {
                     XCTFail("\\n" + message, line: \(expression.location.line + 1))
-                    if \(verbose) && !condition {
+                    if \(verbose) && condition == \(failureCondition) {
                         print(message, terminator: "")
                     }
                 }
