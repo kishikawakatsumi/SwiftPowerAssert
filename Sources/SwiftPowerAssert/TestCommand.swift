@@ -61,12 +61,14 @@ struct TestCommand {
         }
 
         let xcodebuild = Xcodebuild()
+        print("Reading project settings...")
         let rawBuildSettings = try xcodebuild.showBuildSettings(arguments: xcarguments + ["ONLY_ACTIVE_ARCH=NO"])
         let buildSettings = BuildSettings.parse(rawBuildSettings)
         guard let targetBuildSettings = buildSettings.values.filter({ $0.settings["PRODUCT_TYPE"] == "com.apple.product-type.bundle.unit-test" }).first else {
             throw SwiftPowerAssertError.noUnitTestBundle
         }
 
+        print("Building dependencies...")
         let indicesToBeRemoved = buildActions.map { $0.0 } + testOnlyOptions.map{ $0.0 }
         let buildOptions = xcarguments.enumerated().filter { !indicesToBeRemoved.contains($0.offset) }.map { $0.element }
 
@@ -77,6 +79,7 @@ struct TestCommand {
         }
         try xcodebuild.build(arguments: buildOptions + additionalOptions)
 
+        print("Transforming test files...")
         let sdkName = targetBuildSettings.settings["SDK_NAME"]!
         let sdkRoot = targetBuildSettings.settings["SDKROOT"]!
         let platformName = targetBuildSettings.settings["PLATFORM_NAME"]!
@@ -86,17 +89,17 @@ struct TestCommand {
         let deploymentTarget = targetBuildSettings.settings[deploymentTargetSettingName]!
         let builtProductsDirectory = targetBuildSettings.settings["BUILT_PRODUCTS_DIR"]!
 
-        var backupFiles = [String: TemporaryFile]()
-        defer {
-            restoreOriginalSourceFiles(from: backupFiles)
-        }
-
         let temporaryDirectory: TemporaryDirectory
         do {
             temporaryDirectory = try TemporaryDirectory(prefix: "com.kishikawakatsumi.swift-power-assert", removeTreeOnDeinit: true)
         } catch {
             throw SwiftPowerAssertError.writeFailed("unable to create backup directory", error)
         }
+        var backupFiles = [String: TemporaryFile]()
+        defer {
+            restoreOriginalSourceFiles(from: backupFiles)
+        }
+        
         let sources = targetBuildSettings.sources()
         for source in sources {
             var isDirectory: ObjCBool = false
@@ -110,6 +113,7 @@ struct TestCommand {
                     throw SwiftPowerAssertError.writeFailed("unable to backup source files", error)
                 }
 
+                print("\tProcessing: \(source.lastPathComponent)")
                 let dependencies = sources.filter { $0 != source }
                 let options = BuildOptions(sdkName: sdkName, sdkRoot: sdkRoot,
                                            platformName: platformName, platformTargetPrefix: platformTargetPrefix,
@@ -129,6 +133,7 @@ struct TestCommand {
             }
         }
 
+        print("Testing \(targetBuildSettings.target) ...")
         try xcodebuild.invoke(arguments: xcarguments)
     }
 
@@ -148,7 +153,7 @@ private struct Xcodebuild {
     var exec = ["/usr/bin/xcrun", "xcodebuild"]
 
     func build(arguments: [String]) throws {
-        let command = Process(arguments: exec + ["build"] + arguments, redirectOutput: false)
+        let command = Process(arguments: exec + ["build"] + arguments)
         try! command.launch()
         let result = try! command.waitUntilExit()
         switch result.exitStatus {
