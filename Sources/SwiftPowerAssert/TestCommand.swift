@@ -41,35 +41,31 @@ struct TestCommand {
                 if let argument = iterator.next() {
                     testOnlyOptions.append(argument)
                 } else {
-                    throw CommandError.argumentError("xcodebuild option '\(option)' requires an argument")
+                    throw SwiftPowerAssertError.invalidArgument("xcodebuild option '\(option)' requires an argument")
                 }
             case "build", "build-for-testing", "analyze", "archive", "test", "test-without-building", "install-src", "install", "clean":
                 buildActions.append((index, option))
             case "-xctestrun":
-                throw CommandError.argumentError("xcodebuild option '\(option)' not supported")
+                throw SwiftPowerAssertError.invalidArgument("xcodebuild option '\(option)' not supported")
             default:
                 break
             }
         }
 
         if buildActions.map({ $0.1 }).filter({ $0 == "test" || $0 == "build-for-testing" }).isEmpty {
-            throw CommandError.argumentError("xcodebuild action can only be specified as 'test' or 'build-for-testing'")
+            throw SwiftPowerAssertError.invalidArgument("xcodebuild action can only be specified as 'test' or 'build-for-testing'")
         }
 
         let indicesToBeRemoved = buildActions.map { $0.0 } + testOnlyOptions.map{ $0.0 }
         let buildOptions = xcarguments.enumerated().filter { !indicesToBeRemoved.contains($0.offset) }.map { $0.element } + ["ONLY_ACTIVE_ARCH=NO"]
 
         let xcodebuild = Xcodebuild()
-        do {
-            try xcodebuild.build(arguments: buildOptions)
-        } catch {
-            throw CommandError.buildFailed(error)
-        }
+        try xcodebuild.build(arguments: buildOptions)
 
-        let rawBuildSettings = try! xcodebuild.showBuildSettings(arguments: xcarguments + ["ONLY_ACTIVE_ARCH=NO"])
+        let rawBuildSettings = try xcodebuild.showBuildSettings(arguments: xcarguments + ["ONLY_ACTIVE_ARCH=NO"])
         let buildSettings = BuildSettings.parse(rawBuildSettings)
         guard let targetBuildSettings = buildSettings.values.filter({ $0.settings["PRODUCT_TYPE"] == "com.apple.product-type.bundle.unit-test" }).first else {
-            throw CommandError.noUnitTestBundle
+            throw SwiftPowerAssertError.noUnitTestBundle
         }
 
         let sdkName = targetBuildSettings.settings["SDK_NAME"]!
@@ -82,15 +78,28 @@ struct TestCommand {
         let builtProductsDirectory = targetBuildSettings.settings["BUILT_PRODUCTS_DIR"]!
 
         var backupFiles = [String: TemporaryFile]()
-        let temporaryDirectory = try! TemporaryDirectory(prefix: "com.kishikawakatsumi.swift-power-assert", removeTreeOnDeinit: true)
+        defer {
+            restoreOriginalSourceFiles(from: backupFiles)
+        }
+
+        let temporaryDirectory: TemporaryDirectory
+        do {
+            temporaryDirectory = try TemporaryDirectory(prefix: "com.kishikawakatsumi.swift-power-assert", removeTreeOnDeinit: true)
+        } catch {
+            throw SwiftPowerAssertError.writeFailed("unable to create backup directory", error)
+        }
         let sources = targetBuildSettings.sources()
         for source in sources {
             var isDirectory: ObjCBool = false
             if FileManager.default.fileExists(atPath: source.path, isDirectory: &isDirectory) && !isDirectory.boolValue {
-                let temporaryFile = try! TemporaryFile(dir: temporaryDirectory.path, prefix: "Backup", suffix: source.lastPathComponent)
-                try! FileManager.default.removeItem(atPath: temporaryFile.path.asString)
-                try! FileManager.default.copyItem(atPath: source.path, toPath: temporaryFile.path.asString)
-                backupFiles[source.path] = temporaryFile
+                do {
+                    let temporaryFile = try TemporaryFile(dir: temporaryDirectory.path, prefix: "Backup", suffix: source.lastPathComponent)
+                    try FileManager.default.removeItem(atPath: temporaryFile.path.asString)
+                    try FileManager.default.copyItem(atPath: source.path, toPath: temporaryFile.path.asString)
+                    backupFiles[source.path] = temporaryFile
+                } catch {
+                    throw SwiftPowerAssertError.writeFailed("unable to backup source files", error)
+                }
 
                 let dependencies = sources.filter { $0 != source }
                 let options = BuildOptions(sdkName: sdkName, sdkRoot: sdkRoot,
@@ -98,58 +107,72 @@ struct TestCommand {
                                            arch: arch, deploymentTarget: deploymentTarget,
                                            dependencies: dependencies, builtProductsDirectory: builtProductsDirectory)
                 let processor = SwiftPowerAssert(buildOptions: options)
+                let transformed = try processor.processFile(input: source, verbose: verbose)
                 do {
-                    let transformed = try processor.processFile(input: source, verbose: verbose)
                     if let first = sources.first, first == source {
                         try (transformed + "\n\n\n" + __DisplayWidth.myself).write(to: source, atomically: true, encoding: .utf8)
                     } else {
                         try transformed.write(to: source, atomically: true, encoding: .utf8)
                     }
                 } catch {
-                    throw CommandError.instrumentFailed(error)
+                    throw SwiftPowerAssertError.writeFailed("failed to instrument file", error)
                 }
             }
         }
 
-        do {
-            try xcodebuild.invoke(arguments: xcarguments)
-        } catch {
-            throw CommandError.executionFailed(error)
-        }
+        try xcodebuild.invoke(arguments: xcarguments)
+    }
 
+    private func restoreOriginalSourceFiles(from backupFiles: [String: TemporaryFile]) {
         for (original, copy) in backupFiles {
-            try! FileManager.default.removeItem(atPath: original)
-            try! FileManager.default.copyItem(atPath: copy.path.asString, toPath: original)
+            do {
+                try FileManager.default.removeItem(atPath: original)
+                try FileManager.default.copyItem(atPath: copy.path.asString, toPath: original)
+            } catch {
+                print(error.localizedDescription)
+            }
         }
     }
 }
 
 private struct Xcodebuild {
-    func showBuildSettings(arguments: [String]) throws -> String {
-        let command = Process(arguments: ["/usr/bin/xcrun", "xcodebuild", "-showBuildSettings"] + arguments)
-        try command.launch()
-        let result = try command.waitUntilExit()
-        return try result.utf8Output()
-    }
+    var exec = ["/usr/bin/xcrun", "xcodebuild"]
 
     func build(arguments: [String]) throws {
-        try run(action: "build", arguments: arguments)
+        let command = Process(arguments: exec + ["build"] + arguments, redirectOutput: false)
+        try! command.launch()
+        let result = try! command.waitUntilExit()
+        switch result.exitStatus {
+        case .terminated(let code) where code == 0:
+            return
+        default:
+            throw SwiftPowerAssertError.taskError("failed to run the following command: '\(command.arguments.joined(separator: " "))'")
+        }
+    }
+
+    func showBuildSettings(arguments: [String]) throws -> String {
+        let command = Process(arguments: exec + arguments + ["-showBuildSettings"], redirectOutput: false)
+        try! command.launch()
+        let result = try! command.waitUntilExit()
+        let output = try! result.utf8Output()
+        switch result.exitStatus {
+        case .terminated(let code) where code == 0:
+            return output
+        default:
+            throw SwiftPowerAssertError.taskError("failed to run the following command: '\(command.arguments.joined(separator: " "))'")
+        }
     }
 
     func invoke(arguments: [String]) throws {
-        try run(action: nil, arguments: arguments)
-    }
-
-    private func run(action: String?, arguments: [String]) throws {
-        let buildAction: [String]
-        if let action = action {
-            buildAction = [action]
-        } else {
-            buildAction = []
+        let command = Process(arguments: exec + arguments, redirectOutput: false)
+        try! command.launch()
+        let result = try! command.waitUntilExit()
+        switch result.exitStatus {
+        case .terminated(let code) where code == 0:
+            return
+        default:
+            throw SwiftPowerAssertError.taskError("failed to run the following command: '\(command.arguments.joined(separator: " "))'")
         }
-        let command = Process(arguments: ["/usr/bin/xcrun", "xcodebuild"] + buildAction + arguments, redirectOutput: false)
-        try command.launch()
-        try command.waitUntilExit()
     }
 }
 
