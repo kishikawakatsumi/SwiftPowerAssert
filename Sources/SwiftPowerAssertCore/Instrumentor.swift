@@ -494,8 +494,10 @@ class Instrumentor {
                 if \(inUnitTests) {
                     print(message, terminator: "")
                 } else {
-                    XCTFail("\\n" + message, line: \(expression.location.line + 1))
-                    if \(verbose) && condition == \(failureCondition) {
+                    if condition == \(failureCondition) {
+                        XCTFail("\\n" + message, line: \(expression.location.line + 1))
+                    }
+                    if \(verbose) {
                         print(message, terminator: "")
                     }
                 }
