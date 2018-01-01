@@ -72,17 +72,11 @@ public enum SDK {
         switch self {
         case .macosx:
             return "macosx"
-        case .iphoneos:
+        case .iphoneos, .iphonesimulator:
             return "ios"
-        case .iphonesimulator:
-            return "ios"
-        case .watchos:
+        case .watchos, .watchsimulator:
             return "watchos"
-        case .watchsimulator:
-            return "watchos"
-        case .appletvos:
-            return "tvos"
-        case .appletvsimulator:
+        case .appletvos, .appletvsimulator:
             return "tvos"
         }
     }
