@@ -251,6 +251,7 @@ class Instrumentor {
     }
 
     private func instrument(expression: Expression, recordValues: String, condition: String, assertion: String) -> String {
+        let inUnitTests = NSClassFromString("XCTest") != nil
         return """
 
         do {
@@ -329,21 +330,22 @@ class Instrumentor {
                 return \(condition)
             }()
             if \(verbose) || !condition {
+                var message = ""
                 func align(current: inout Int, column: Int, string: String) {
                     while current < column - 1 {
-                        print(" ", terminator: "")
+                        message += " "
                         current += 1
                     }
-                    print(string, terminator: "")
+                    message += string
                     current += __DisplayWidth.of(string, inEastAsian: true)
                 }
-                print("\(assertion)")
+                message += "\(assertion)\\n"
                 var values = Array(valueColumns).sorted { $0.0 < $1.0 }
                 var current = 0
                 for value in values {
                     align(current: &current, column: value.0, string: "|")
                 }
-                print()
+                message += "\\n"
                 while !values.isEmpty {
                     var current = 0
                     var index = 0
@@ -356,7 +358,15 @@ class Instrumentor {
                             index += 1
                         }
                     }
-                    print()
+                    message += "\\n"
+                }
+                if \(inUnitTests) {
+                    print(message, terminator: "")
+                } else {
+                    XCTFail("\\n" + message, line: \(expression.location.line + 1))
+                    if \(verbose) && !condition {
+                        print(message, terminator: "")
+                    }
                 }
             }
         }
