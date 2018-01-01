@@ -25,7 +25,7 @@ private class TestRunner {
         return try! TemporaryDirectory(prefix: "com.kishikawakatsumi.swift-power-assert", removeTreeOnDeinit: true)
     }()
     private lazy var temporaryFile = {
-        return try! TemporaryFile(dir: temporaryDirectory.path, suffix: ".swift").path
+        return try! TemporaryFile(dir: temporaryDirectory.path, prefix: "Tests", suffix: ".swift").path
     }()
     private lazy var sourceFilePath = {
         return temporaryFile.asString
@@ -1487,6 +1487,45 @@ class SwiftPowerAssertTests: XCTestCase {
                    |     |    false
                    |     "岸川克己"
                    (name: "岸川克己", age: 37, birthday: 1980-10-27 15:00:00 +0000)
+
+            """
+
+        let result = TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
+    func testConditionalCompilationBlock() throws {
+        let source = """
+            import XCTest
+
+            struct Bar {
+                let foo: Foo
+                var val: Int
+            }
+
+            struct Foo {
+                var val: Int
+            }
+
+            class Tests: XCTestCase {
+                @objc dynamic func testMethod() {
+                    let bar = Bar(foo: Foo(val: 2), val: 3)
+                    #if swift(>=3.2)
+                        assert(bar.val == bar.foo.val)
+                    #endif
+                }
+            }
+
+            """
+
+        let expected = """
+            assert(bar.val == bar.foo.val)
+                   |   |   |  |   |   |
+                   |   3   |  |   |   2
+                   |       |  |   Foo(val: 2)
+                   |       |  Bar(foo: main.Foo(val: 2), val: 3)
+                   |       false
+                   Bar(foo: main.Foo(val: 2), val: 3)
 
             """
 

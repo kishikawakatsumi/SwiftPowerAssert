@@ -42,6 +42,16 @@ struct Expression {
     var expressions = [Expression]()
 }
 
+extension Expression: Hashable {
+    var hashValue: Int {
+        return range.hashValue
+    }
+
+    static func ==(lhs: Expression, rhs: Expression) -> Bool {
+        return lhs.range == rhs.range
+    }
+}
+
 enum Declaration {
     case `class`(ClassDeclaration)
     case function(FunctionDeclaration)
@@ -62,8 +72,6 @@ struct FunctionDeclaration {
     let accessLevel: String
     let name: String
     let parameters: [Parameter]
-    let throwBehavior: String?
-    let result: FunctionResult?
     let body: [Statement]
 }
 
@@ -82,7 +90,27 @@ struct SourceRange {
     let end: SourceLocation
 }
 
+extension SourceRange: Hashable {
+    var hashValue: Int {
+        return 31 &* start.hashValue &+ end.hashValue
+    }
+
+    static func ==(lhs: SourceRange, rhs: SourceRange) -> Bool {
+        return lhs.start == rhs.start && lhs.end == rhs.end
+    }
+}
+
 struct SourceLocation {
     let line: Int
     let column: Int
+}
+
+extension SourceLocation: Hashable {
+    var hashValue: Int {
+        return 31 &* line &+ column
+    }
+
+    static func ==(lhs: SourceLocation, rhs: SourceLocation) -> Bool {
+        return lhs.line == rhs.line && lhs.column == rhs.column
+    }
 }

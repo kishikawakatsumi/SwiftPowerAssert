@@ -17,6 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 import Foundation
+import Basic
 
 class Instrumentor {
     let source: String
@@ -39,7 +40,7 @@ class Instrumentor {
     }
 
     func instrument(node: AST) -> String {
-        var expressions = [Expression]()
+        var expressions = OrderedSet<Expression>()
 
         node.declarations.forEach {
             switch $0 {
@@ -153,7 +154,7 @@ class Instrumentor {
                 let column = columnInFunctionCall(column: childExpression.range.end.column, startLine: childExpression.range.start.line, endLine: childExpression.range.end.line, tokens: tokens, child: childExpression, parent: expression)
 
                 if source.hasPrefix(".") {
-                    values[column] = childExpression.type + formatter.format(tokens: formatter.tokenize(source: source))
+                    values[column] = childExpression.type.replacingOccurrences(of: "@lvalue ", with: "") + formatter.format(tokens: formatter.tokenize(source: source))
                 } else {
                     values[column] = formatter.format(tokens: formatter.tokenize(source: source))
                 }
@@ -256,6 +257,18 @@ class Instrumentor {
 
         do {
             struct __Util {
+                static func condition<T>(_ parameters: (lhs: T, rhs: T)) -> Bool where T: Equatable {
+                    return parameters.lhs == parameters.rhs
+                }
+                static func condition<T>(_ parameters: (lhs: T, rhs: T, message: String)) -> Bool where T: Equatable {
+                    return condition((parameters.lhs, parameters.rhs))
+                }
+                static func condition<T>(_ parameters: (lhs: T, rhs: T, message: String, file: StaticString)) -> Bool where T: Equatable {
+                    return condition((parameters.lhs, parameters.rhs))
+                }
+                static func condition<T>(_ parameters: (lhs: T, rhs: T, message: String, file: StaticString, line: UInt)) -> Bool where T: Equatable {
+                    return condition((parameters.lhs, parameters.rhs))
+                }
                 static func condition<T>(_ parameters: (lhs: T?, rhs: T?)) -> Bool where T: Equatable {
                     return parameters.lhs == parameters.rhs
                 }

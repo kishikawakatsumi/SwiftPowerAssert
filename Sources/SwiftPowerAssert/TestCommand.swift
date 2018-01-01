@@ -21,7 +21,13 @@ import Basic
 import SwiftPowerAssertCore
 
 struct TestCommand {
-    func run(xcarguments: [String], verbose: Bool = false) throws {
+    func run(xcarguments arguments: [String], verbose: Bool = false) throws {
+        let xcarguments: [String]
+        if let first = arguments.first, first == "xcodebuild" {
+            xcarguments = Array(arguments.dropFirst())
+        } else {
+            xcarguments = arguments
+        }
         var iterator = xcarguments.enumerated().makeIterator()
         var buildActions = [(Int, String)]()
         var testOnlyOptions = [(Int, String)]()
