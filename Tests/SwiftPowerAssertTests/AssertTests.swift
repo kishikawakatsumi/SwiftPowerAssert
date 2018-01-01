@@ -38,7 +38,6 @@ class AssertTests: XCTestCase {
                     assert(bar.val == bar.foo.val)
                 }
             }
-
             """
 
         let expected = """
@@ -75,7 +74,6 @@ class AssertTests: XCTestCase {
                     assert(bar.val < bar.foo.val)
                 }
             }
-
             """
 
         let expected = """
@@ -108,7 +106,6 @@ class AssertTests: XCTestCase {
                     assert(array.index(of: zero) == two)
                 }
             }
-
             """
 
         let expected = """
@@ -138,7 +135,6 @@ class AssertTests: XCTestCase {
                     assert(array.description.hasPrefix("[") == false && array.description.hasPrefix("Hello") == true)
                 }
             }
-
             """
 
         let expected = """
@@ -180,7 +176,6 @@ class AssertTests: XCTestCase {
                     assert(array.index(of: zero) == two && bar.val == bar.foo.val)
                 }
             }
-
             """
 
         let expected = """
@@ -214,7 +209,6 @@ class AssertTests: XCTestCase {
                     assert(array.distance(from: 2, to: 3) == 4)
                 }
             }
-
             """
 
         let expected = """
@@ -246,7 +240,6 @@ class AssertTests: XCTestCase {
                     assert([one, two, three].count == 10)
                 }
             }
-
             """
 
         let expected = """
@@ -287,7 +280,6 @@ class AssertTests: XCTestCase {
                     assert((object.types[index] as! Person).name == bob.name)
                 }
             }
-
             """
 
         let expected = """
@@ -333,7 +325,6 @@ class AssertTests: XCTestCase {
                             .foo        .val)
                 }
             }
-
             """
 
         let expected = """
@@ -398,7 +389,6 @@ class AssertTests: XCTestCase {
                     )
                 }
             }
-
             """
 
         let expected = """
@@ -443,7 +433,6 @@ class AssertTests: XCTestCase {
                         true)
                 }
             }
-
             """
 
         let expected = """
@@ -499,7 +488,6 @@ class AssertTests: XCTestCase {
                     )
                 }
             }
-
             """
 
         let expected = """
@@ -539,7 +527,6 @@ class AssertTests: XCTestCase {
                             == 4)
                 }
             }
-
             """
 
         let expected = """
@@ -576,7 +563,6 @@ class AssertTests: XCTestCase {
                         == 10)
                 }
             }
-
             """
 
         let expected = """
@@ -619,7 +605,6 @@ class AssertTests: XCTestCase {
                         JSONEncoder().encode(landmark))
                 }
             }
-
             """
 
         let expected = """
@@ -662,7 +647,6 @@ class AssertTests: XCTestCase {
                     assert(number != nil && number == 1111)
                 }
             }
-
             """
 
         let expected = """
@@ -718,7 +702,6 @@ class AssertTests: XCTestCase {
                     assert([one, two, three].index(of: zero) == two)
                 }
             }
-
             """
 
         let expected = """
@@ -747,7 +730,6 @@ class AssertTests: XCTestCase {
                     assert([zero: one, two: three].count == three)
                 }
             }
-
             """
 
         let expected = """
@@ -773,7 +755,6 @@ class AssertTests: XCTestCase {
                            .blue == #colorLiteral(red: 0.8078431487, green: 0.02745098062, blue: 0.3333333433, alpha: 1))
                 }
             }
-
             """
         
         let expected = """
@@ -825,7 +806,6 @@ class AssertTests: XCTestCase {
                     assert(super.continueAfterFailure == false)
                 }
             }
-
             """
 
         let expected = """
@@ -859,7 +839,6 @@ class AssertTests: XCTestCase {
                     assert(mask != [.layerMaxXMargin, .layerMaxYMargin])
                 }
             }
-
             """
 
         let expected = """
@@ -900,7 +879,6 @@ class AssertTests: XCTestCase {
                     assert(tuple.name != ("Katsumi", 37, date2).0 || tuple.age != ("Katsumi", 37, date2).1)
                 }
             }
-
             """
 
         let expected = """
@@ -970,7 +948,6 @@ class AssertTests: XCTestCase {
                     assert(nested.getValue(keyPath: \\.outer.someValue) == 13)
                 }
             }
-
             """
 
         let expected = """
@@ -1062,7 +1039,6 @@ class AssertTests: XCTestCase {
                     assert(interestingNumbers[keyPath: \\[String: [Int]].["hexagonal"]!.count.bitWidth] != 64)
                 }
             }
-
             """
 
         let expected = """
@@ -1128,7 +1104,6 @@ class AssertTests: XCTestCase {
                     assert([1, 2, 3].map(String.init).reduce("", +) != "123")
                 }
             }
-
             """
 
         let expected = """
@@ -1156,7 +1131,6 @@ class AssertTests: XCTestCase {
                     assert(String.self == Int.self && "string".self == "string")
                 }
             }
-
             """
 
         let expected = """
@@ -1185,7 +1159,6 @@ class AssertTests: XCTestCase {
                     assert(someDictionary["a"]![0] == 100)
                 }
             }
-
             """
 
         let expected = """
@@ -1236,7 +1209,6 @@ class AssertTests: XCTestCase {
                     assert(someDictionary["a"]?[0] == 99)
                 }
             }
-
             """
 
         let expected = """
@@ -1306,7 +1278,6 @@ class AssertTests: XCTestCase {
                     assert(tuple.name != ("岸川克己", 37, date).0 || tuple.age != ("😇岸川克己🇯🇵", 37, date).1)
                 }
             }
-
             """
 
         let expected = """
@@ -1444,7 +1415,6 @@ class AssertTests: XCTestCase {
                     #endif
                 }
             }
-
             """
 
         let expected = """
@@ -1482,7 +1452,6 @@ class AssertTests: XCTestCase {
                     assert(#selector(getter: SomeClass.property) == #selector(getter: NSObjectProtocol.description))
                 }
             }
-
             """
 
         let expected = """
