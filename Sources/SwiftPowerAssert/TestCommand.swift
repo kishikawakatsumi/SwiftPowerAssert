@@ -151,7 +151,7 @@ private struct Xcodebuild {
     }
 
     func showBuildSettings(arguments: [String]) throws -> String {
-        let command = Process(arguments: exec + arguments + ["-showBuildSettings"], redirectOutput: false)
+        let command = Process(arguments: exec + arguments + ["-showBuildSettings"])
         try! command.launch()
         let result = try! command.waitUntilExit()
         let output = try! result.utf8Output()
