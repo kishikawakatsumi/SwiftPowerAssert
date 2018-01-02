@@ -53,41 +53,16 @@ Copy the file (`.build/x86_64-apple-macosx10.10/release/swift-power-assert`) to 
 Getting Started
 ---------------------------------------
 
-SwiftPowerAssert injects instrument code into the `assert()` methods. There is no automatic mechanism to hook the compiler in Xcode unfortunately, so setup it manually using "Run Script Phase."
+Replace `xcodebuild test...` command with `swift-power-assert test`
 
-<img src='https://user-images.githubusercontent.com/40610/33810940-3b62ae9c-de4f-11e7-9c0d-43fa9d705fcc.png' alt='Pre/Post build actions'>
-
-Instrument the source code with `SwiftPowerAssert instrument ...` command.
-
-Note: Back up the source files to a temporary directory to restore after compilation.
-
-```shell
-cp -R "${SRCROOT%/}/Tests" $TMPDIR
-
-/path/to/swift-power-assert instrument "${SRCROOT%/}/Tests"
-```
-
-Restore the original source files from backup after compilation.
-
-```shell
-cp -R "${TMPDIR%/}/Tests" "$SRCROOT"
-```
+Note: SwiftPowerAssert injects instrument code into the `XCTAssert()` methods during tests. SwiftPowerAssert back up the source files before executing tests and restore automatically when the tests finished. However, the original files may not be restored due to an unexpected crash or something wrong. Please use it for the project under Git.
 
 Usage
 ---------------------------------------
-Inject an instrument code into the `*.swift` files in the specified directory.
 
 ```shell
-/path/to/swift-power-assert instrument file_or_directory
+/path/to/swift-power-assert test --xcargs -workspace SwiftPowerAssert.xcworkspace -scheme "SwiftPowerAssert" -sdk iphonesimulator -destination "name=iPhone SE,OS=10.3.1" test
 ```
-
-Replace `XCTAssertXXX()` methods with `assert()`.
-
-| XCTest        | SwiftPowerAssert|
-| ------------- |-------------|
-| `XCTAssertEqual(username, "kishikawakatsumi")` |`assert(username == "kishikawakatsumi")` |
-| `XCTAssertEqual(bar.val, bar.foo.val)`         |`assert(bar.val == bar.foo.val)`         |
-| `XCTAssertNil(error)`                          |`assert(error == nil)`                   |
 
 Author
 ---------------------------------------
