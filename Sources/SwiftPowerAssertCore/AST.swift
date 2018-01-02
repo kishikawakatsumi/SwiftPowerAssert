@@ -28,6 +28,7 @@ enum Statement {
 }
 
 struct Expression {
+    let identifier = UUID()
     let rawValue: String
     let type: String!
     let rawLocation: String!
@@ -43,11 +44,11 @@ struct Expression {
 
 extension Expression: Hashable {
     var hashValue: Int {
-        return range.hashValue
+        return identifier.hashValue
     }
 
     static func ==(lhs: Expression, rhs: Expression) -> Bool {
-        return lhs.range == rhs.range && lhs.rawValue == rhs.rawValue
+        return lhs.identifier == rhs.identifier
     }
 }
 

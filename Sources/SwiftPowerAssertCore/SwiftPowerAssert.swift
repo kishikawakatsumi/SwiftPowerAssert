@@ -43,7 +43,7 @@ public final class SwiftPowerAssert {
         let tokens = tokenize(rawAST: rawAST)
         let node = lex(tokens: tokens)
         let root = parse(node: node)
-        let transformed = instrument(source: sourceText, root: root, verbose: verbose)
+        let transformed = transform(source: sourceText, root: root, verbose: verbose)
         return transformed
     }
 
@@ -104,8 +104,8 @@ public final class SwiftPowerAssert {
         return parser.parse(root: node)
     }
 
-    private func instrument(source: String, root: AST, verbose: Bool = false) -> String {
-        let instrumentor = Instrumentor(source: source, verbose: verbose)
-        return instrumentor.instrument(node: root)
+    private func transform(source: String, root: AST, verbose: Bool = false) -> String {
+        let transformer = Transformer(source: source, verbose: verbose)
+        return transformer.transform(node: root)
     }
 }

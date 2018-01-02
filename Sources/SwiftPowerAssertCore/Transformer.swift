@@ -19,28 +19,25 @@
 import Foundation
 import Basic
 
-class Instrumentor {
-    let source: String
-    let sourceIndices: [Int: Int]
+class Transformer {
+    let sourceFile: SourceFile
     let verbose: Bool
 
     init(source: String, verbose: Bool = false) {
-        self.source = source
-        var sourceIndices = [Int: Int]()
-        var index = 0
-        var characterCount = 0
+        var lineNumber = 1
+        var offset = 0
+        var sourceLines = [SourceLine]()
         source.enumerateLines { (line, stop) in
-            let count = line.utf8.count
-            sourceIndices[index] = characterCount + count + 1
-            index += 1
-            characterCount += count + 1
+            sourceLines.append(SourceLine(line: line.utf8, lineNumber: lineNumber, offset: offset))
+            lineNumber += 1
+            offset += line.utf8.count + 1 // characters + newline
         }
-        self.sourceIndices = sourceIndices
+        self.sourceFile = SourceFile(sourceText: source.utf8, sourceLines: sourceLines)
         self.verbose = verbose
     }
 
-    func instrument(node: AST) -> String {
-        var expressions = OrderedSet<Expression>()
+    func transform(node: AST) -> String {
+        var expressions = OrderedSet<ExpressionMap>()
 
         node.declarations.forEach {
             switch $0 {
@@ -66,7 +63,7 @@ class Instrumentor {
                                                  "XCTest.(file).XCTAssertGreaterThanOrEqual(_:_:_:file:line:)",
                                                  "XCTest.(file).XCTAssertLessThanOrEqual(_:_:_:file:line:)",
                                                  "XCTest.(file).XCTAssertLessThan(_:_:_:file:line:)":
-                                                expressions.append(expression)
+                                                expressions.append(ExpressionMap(sourceRange: expression.range, expression: expression))
                                             default:
                                                 break
                                             }
@@ -86,36 +83,35 @@ class Instrumentor {
             }
         }
 
-        var instruments = [(SourceRange, String)]()
-        for expression in expressions {
-            let source = instrument(functionCall: expression)
-            instruments.append((expression.range!, source))
+        var replacements = [Replacement]()
+        for expressionMap in expressions {
+            let source = instrument(functionCall: expressionMap.expression)
+            replacements.append(Replacement(sourceRange: expressionMap.sourceRange, sourceText: source))
         }
 
-        var instrumented = source
-        for instrument in instruments.reversed() {
-            let sourceLocation = instrument.0
-            let code = instrument.1
+        var sourceText = sourceFile.sourceText
+        for replacement in replacements.reversed() {
+            let sourceRange = replacement.sourceRange
+            let transformedSource = replacement.sourceText
 
-            let utf8 = source.utf8
             let startIndex: String.Index
-            if sourceLocation.start.line > 0 {
-                startIndex = utf8.index(utf8.startIndex, offsetBy: sourceIndices[sourceLocation.start.line - 1]! + sourceLocation.start.column)
+            if sourceRange.start.line > 0 {
+                startIndex = sourceText.index(sourceText.startIndex, offsetBy: sourceFile.sourceLines[sourceRange.start.line].offset + sourceRange.start.column)
             } else {
-                startIndex = utf8.index(utf8.startIndex, offsetBy: sourceLocation.start.column)
+                startIndex = sourceText.index(sourceText.startIndex, offsetBy: sourceRange.start.column)
             }
             let endIndex: String.Index
-            if sourceLocation.end.line > 0 {
-                endIndex = utf8.index(utf8.startIndex, offsetBy: sourceIndices[sourceLocation.end.line - 1]! + sourceLocation.end.column)
+            if sourceRange.end.line > 0 {
+                endIndex = sourceText.index(sourceText.startIndex, offsetBy: sourceFile.sourceLines[sourceRange.end.line].offset + sourceRange.end.column)
             } else {
-                endIndex = utf8.index(utf8.startIndex, offsetBy: sourceLocation.end.column)
+                endIndex = sourceText.index(sourceText.startIndex, offsetBy: sourceRange.end.column)
             }
-            let prefix = instrumented.utf8.prefix(upTo: startIndex)
-            let suffix = instrumented.utf8.suffix(from: endIndex)
-            instrumented = String(prefix)! + code + String(suffix)!
+            let prefix = sourceText.prefix(upTo: startIndex)
+            let suffix = sourceText.suffix(from: endIndex)
+            sourceText = (String(prefix)! + transformedSource + String(suffix)!).utf8
         }
 
-        return instrumented
+        return String(sourceText)
     }
 
     private func instrument(functionCall expression: Expression) -> String {
@@ -163,7 +159,7 @@ class Instrumentor {
                 break
             }
         }
-        return source(from: expression.range)
+        return sourceFile[expression.range]
     }
 
     private func recordValues(_ expression: Expression, _ numberOfParameters: Int) -> [Int: String] {
@@ -181,8 +177,8 @@ class Instrumentor {
             guard let wholeRange = expression.range, let valueRange = childExpression.range, wholeRange != valueRange else {
                 return
             }
-            let wholeExpressionSource = source(from: wholeRange)
-            let valueExpressionSource = source(from: valueRange)
+            let wholeExpressionSource = sourceFile[wholeRange]
+            let valueExpressionSource = sourceFile[valueRange]
 
             if (childExpression.rawValue == "declref_expr" && !childExpression.type.contains("->")) ||
                 childExpression.rawValue == "magic_identifier_literal_expr" {
@@ -297,9 +293,9 @@ class Instrumentor {
     }
 
     private func instrument(expression: Expression, with values: [Int: String], failureCondition: Bool = false) -> String {
-        let expressionSource = source(from: expression.range)
+        let expressionSource = sourceFile[expression.range]
         let tupleExpression = expression.expressions[1]
-        let tupleExpressionSource = source(from: tupleExpression.range)
+        let tupleExpressionSource = sourceFile[tupleExpression.range]
         let formatter = Formatter()
         let recordValues = recordValuesCodeFragment(values: values)
         let condition = "__Util.equal(\(formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource), withHint: tupleExpression)))"
@@ -308,8 +304,8 @@ class Instrumentor {
     }
 
     private func instrument(equality expression: Expression, tupleExpression: Expression, values: [Int: String], failureCondition: Bool = false) -> String {
-        let expressionSource = source(from: expression.range)
-        let tupleExpressionSource = source(from: tupleExpression.range)
+        let expressionSource = sourceFile[expression.range]
+        let tupleExpressionSource = sourceFile[tupleExpression.range]
         let formatter = Formatter()
         let recordValues = recordValuesCodeFragment(values: values)
         let condition = "__Util.equal(\(formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource), withHint: tupleExpression)))"
@@ -318,9 +314,9 @@ class Instrumentor {
     }
 
     private func instrument(greaterThan expression: Expression, tupleExpression: Expression, values: [Int: String], failureCondition: Bool = false) -> String {
-        let expressionSource = source(from: expression.range)
+        let expressionSource = sourceFile[expression.range]
         let tupleExpression = expression.expressions[1]
-        let tupleExpressionSource = source(from: tupleExpression.range)
+        let tupleExpressionSource = sourceFile[tupleExpression.range]
         let formatter = Formatter()
         let recordValues = recordValuesCodeFragment(values: values)
         let condition = "__Util.greaterThan(\(formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource), withHint: tupleExpression)))"
@@ -329,9 +325,9 @@ class Instrumentor {
     }
 
     private func instrument(greaterThanOrEqual expression: Expression, tupleExpression: Expression, values: [Int: String], failureCondition: Bool = false) -> String {
-        let expressionSource = source(from: expression.range)
+        let expressionSource = sourceFile[expression.range]
         let tupleExpression = expression.expressions[1]
-        let tupleExpressionSource = source(from: tupleExpression.range)
+        let tupleExpressionSource = sourceFile[tupleExpression.range]
         let formatter = Formatter()
         let recordValues = recordValuesCodeFragment(values: values)
         let condition = "__Util.greaterThanOrEqual(\(formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource), withHint: tupleExpression)))"
@@ -508,7 +504,7 @@ class Instrumentor {
     }
 
     private func stringLiteralExpression(_ child: Expression, _ parent: Expression) -> String {
-        var source = self.source(from: child.range)
+        var source =  sourceFile[child.range]
         let rest = restOfExpression(child, parent)
         var previous = ""
         for character in rest {
@@ -566,27 +562,27 @@ class Instrumentor {
     }
 
     private func completeExpressionSource(_ child: Expression, _ parent: Expression) -> String {
-        let source = self.source(from: child.range)
+        let source = sourceFile[child.range]
         let rest = restOfExpression(child, parent)
         return extendExpression(rest, source)
     }
 
     private func restOfExpression(_ child: Expression, _ parent: Expression) -> String {
-        let utf8 = source.utf8
+        let sourceText = sourceFile.sourceText
         let startIndex: String.Index
         if child.range.end.line > 0 {
-            startIndex = utf8.index(utf8.startIndex, offsetBy: sourceIndices[child.range.end.line - 1]! + child.range.end.column)
+            startIndex = sourceText.index(sourceText.startIndex, offsetBy: sourceFile.sourceLines[child.range.end.line].offset + child.range.end.column)
         } else {
-            startIndex = utf8.index(utf8.startIndex, offsetBy: child.range.end.column)
+            startIndex = sourceText.index(sourceText.startIndex, offsetBy: child.range.end.column)
         }
         let endIndex: String.Index
         if parent.range.end.line > 0 {
-            endIndex = utf8.index(utf8.startIndex, offsetBy: sourceIndices[parent.range.end.line - 1]! + parent.range.end.column)
+            endIndex = sourceText.index(sourceText.startIndex, offsetBy: sourceFile.sourceLines[parent.range.end.line].offset + parent.range.end.column)
         } else {
-            endIndex = utf8.index(utf8.startIndex, offsetBy: parent.range.end.column)
+            endIndex = sourceText.index(sourceText.startIndex, offsetBy: parent.range.end.column)
         }
 
-        return String(utf8[startIndex..<endIndex])!
+        return String(sourceText[startIndex..<endIndex])!
     }
 
     private func extendExpression(_ rest: String, _ source: String) -> String {
@@ -642,390 +638,14 @@ class Instrumentor {
         }
 
         let formatter = Formatter()
-        let whole = formatter.format(tokens: formatter.tokenize(source: source(from: parent.range))).utf8
+        let whole = formatter.format(tokens: formatter.tokenize(source: sourceFile[parent.range])).utf8
         let prefix = whole.prefix(upTo: whole.index(whole.startIndex, offsetBy: columnIndex - indent))
         
         return __DisplayWidth.of(String(prefix)!, inEastAsian: true)
     }
+}
 
-    private func source(from range: SourceRange) -> String {
-        let utf8 = source.utf8
-        let start = range.start
-        let end = range.end
-        let startIndex: String.Index
-        if start.line > 0 {
-            startIndex = utf8.index(utf8.startIndex, offsetBy: sourceIndices[start.line - 1]! + start.column)
-        } else {
-            startIndex = utf8.index(utf8.startIndex, offsetBy: start.column)
-        }
-        let endIndex: String.Index
-        if end.line > 0 {
-            endIndex = utf8.index(utf8.startIndex, offsetBy: sourceIndices[end.line - 1]! + end.column)
-        } else {
-            endIndex = utf8.index(utf8.startIndex, offsetBy: end.column)
-        }
-        return String(source[startIndex..<endIndex])
-    }
-
-    class Formatter {
-        class State {
-            enum Mode {
-                case plain
-                case token
-                case string
-                case stringEscape
-                case newline
-                case indent
-            }
-
-            var mode = Mode.plain
-            var tokens = [Token]()
-            var storage = ""
-            var input: String
-
-            init(input: String) {
-                self.input = input
-            }
-        }
-
-        func tokenize(source: String) -> [Token] {
-            let state = State(input: source)
-            for character in state.input {
-                switch state.mode {
-                case .plain:
-                    switch character {
-                    case "\"":
-                        state.mode = .string
-                    case "\n":
-                        state.tokens.append(Token(type: .newline, value: String(character)))
-                        state.mode = .newline
-                    case "(", ")", "[", "]", "{", "}", ",", ".", ":", ";":
-                        state.tokens.append(Token(type: .token, value: String(character)))
-                    case " ", "\t":
-                        state.tokens.append(Token(type: .token, value: " "))
-                    default:
-                        state.mode = .token
-                        state.storage = String(character)
-                    }
-                case .token:
-                    switch character {
-                    case "\"":
-                        state.tokens.append(Token(type: .token, value: state.storage))
-                        state.mode = .string
-                        state.storage = ""
-                    case " ":
-                        state.tokens.append(Token(type: .token, value: state.storage))
-                        state.tokens.append(Token(type: .token, value: " "))
-                        state.mode = .plain
-                        state.storage = ""
-                    case "\n":
-                        state.tokens.append(Token(type: .token, value: state.storage))
-                        state.tokens.append(Token(type: .newline, value: "\n"))
-                        state.mode = .newline
-                        state.storage = ""
-                    case "(", ")", "[", "]", "{", "}", ",", ".", ":", ";":
-                        state.tokens.append(Token(type: .token, value: state.storage))
-                        state.tokens.append(Token(type: .token, value: String(character)))
-                        state.mode = .plain
-                        state.storage = ""
-                    default:
-                        state.storage += String(character)
-                    }
-                case .string:
-                    switch character {
-                    case "\"":
-                        state.tokens.append(Token(type: .string, value: state.storage))
-                        state.mode = .plain
-                        state.storage = ""
-                    case "\\":
-                        state.mode = .stringEscape
-                    default:
-                        state.storage += String(character)
-                    }
-                case .stringEscape:
-                    switch character {
-                    case "\"", "\\":
-                        state.mode = .string
-                        state.storage += "\\" + String(character)
-                    case "n":
-                        state.mode = .string
-                        state.storage += "\n"
-                    case "t":
-                        state.mode = .string
-                        state.storage += "\t"
-                    default:
-                        fatalError("unexpected '\(character)' in string escape")
-                    }
-                case .indent:
-                    switch character {
-                    case "\"":
-                        state.tokens.append(Token(type: .indent(state.storage.count), value: state.storage))
-                        state.mode = .string
-                        state.storage = ""
-                    case " ", "\t":
-                        state.storage += " "
-                    case "\n":
-                        state.tokens.append(Token(type: .indent(state.storage.count), value: state.storage))
-                        state.tokens.append(Token(type: .newline, value: String(character)))
-                        state.mode = .newline
-                        state.storage = ""
-                    case "(", ")", "[", "]", "{", "}", ",", ".", ":", ";":
-                        state.tokens.append(Token(type: .indent(state.storage.count), value: state.storage))
-                        state.tokens.append(Token(type: .token, value: String(character)))
-                        state.mode = .plain
-                        state.storage = ""
-                    default:
-                        state.tokens.append(Token(type: .indent(state.storage.count), value: state.storage))
-                        state.mode = .token
-                        state.storage = String(character)
-                    }
-                case .newline:
-                    switch character {
-                    case " ", "\t":
-                        state.mode = .indent
-                        state.storage = String(character)
-                    case "(", ")", "[", "]", "{", "}", ",", ".", ":", ";":
-                        state.tokens.append(Token(type: .token, value: String(character)))
-                        state.mode = .plain
-                    case "\n":
-                        state.tokens.append(Token(type: .newline, value: String(character)))
-                    default:
-                        state.mode = .token
-                        state.storage = String(character)
-                    }
-                }
-            }
-            if !state.storage.isEmpty {
-                switch state.mode {
-                case .indent:
-                    state.tokens.append(Token(type: .indent(state.storage.count), value: state.storage))
-                case .newline:
-                    state.tokens.append(Token(type: .newline, value: state.storage))
-                case .string:
-                    state.tokens.append(Token(type: .string, value: state.storage))
-                default:
-                    state.tokens.append(Token(type: .token, value: state.storage))
-                }
-            }
-            return state.tokens
-        }
-
-        func format(tokens: [Token]) -> String {
-            var formatted = ""
-            for token in tokens {
-                switch token.type {
-                case .token:
-                    formatted += token.value
-                case .string:
-                    formatted += "\"" + token.value + "\""
-                case .indent(_):
-                    break
-                case .newline:
-                    formatted += " "
-                }
-            }
-            return formatted
-        }
-
-        func format(tokens: [Token], withHint expression: Expression) -> String {
-            let range = expression.range
-            var line = range!.start.line
-            var column = range!.start.column
-
-            var formatted = ""
-            for (index, token) in tokens.enumerated() {
-                switch token.type {
-                case .token:
-                    formatted += token.value
-                    column += token.value.utf8.count
-                case .string:
-                    let string = "\"" + token.value + "\""
-                    formatted += string
-                    column += string.utf8.count
-                case .indent(let count):
-                    column += count
-                case .newline:
-                    let needed = isSemicolonNeeded(line: line, column: column, expression: expression)
-                    let required = isSemicolonRequired(startIndex: index, tokens: tokens)
-                    let canAppend = canAppendSemicolon(startIndex: index, tokens: tokens)
-                    let isAbleToAppend = isAbleToAppendSemicolon(startIndex: index, tokens: tokens, line: line, column: column, expression: expression)
-                    formatted += (needed || required) && canAppend && isAbleToAppend ? ";" : " "
-                    column = 0
-                    line += 1
-                }
-            }
-            return formatted
-        }
-
-        func escaped(tokens: [Token]) -> String {
-            var formatted = ""
-            for token in tokens {
-                switch token.type {
-                case .token:
-                    formatted += token.value.replacingOccurrences(of: "\\", with: "\\\\")
-                case .string:
-                    formatted += "\\\"" + token.value.replacingOccurrences(of: "\"", with: "\\\\\"") + "\\\""
-                case .indent(_):
-                    break
-                case .newline:
-                    formatted += " "
-                }
-            }
-            return formatted
-        }
-
-        func escaped(tokens: [Token], withHint expression: Expression) -> String {
-            let range = expression.range
-            var line = range!.start.line
-            var column = range!.start.column
-
-            var formatted = ""
-            for (index, token) in tokens.enumerated() {
-                switch token.type {
-                case .token:
-                    let value = token.value
-                    formatted += value.replacingOccurrences(of: "\\", with: "\\\\")
-                    column += value.utf8.count
-                case .string:
-                    formatted += "\\\"" + token.value.replacingOccurrences(of: "\"", with: "\\\\\"") + "\\\""
-                    column += token.value.utf8.count + 2
-                case .indent(let count):
-                    column += count
-                case .newline:
-                    let needed = isSemicolonNeeded(line: line, column: column, expression: expression)
-                    let required = isSemicolonRequired(startIndex: index, tokens: tokens)
-                    let canAppend = canAppendSemicolon(startIndex: index, tokens: tokens)
-                    let isAbleToAppend = isAbleToAppendSemicolon(startIndex: index, tokens: tokens, line: line, column: column, expression: expression)
-                    formatted += (needed || required) && canAppend && isAbleToAppend ? ";" : " "
-                    column = 0
-                    line += 1
-                }
-            }
-            return formatted
-        }
-
-        private func traverse(_ expression: Expression, closure: (_ expression: Expression, _ skipChildren: inout Bool) -> ()) {
-            var skip = false
-            closure(expression, &skip)
-            if skip {
-                return
-            }
-            for expression in expression.expressions {
-                traverse(expression, closure: closure)
-            }
-        }
-
-        private func isSemicolonNeeded(line: Int, column: Int, expression: Expression) -> Bool {
-            var semicolonNeeded = false
-            traverse(expression) { (expression, skip) in
-                guard let range = expression.range else {
-                    return
-                }
-                if (expression.rawValue == "binary_expr" || expression.rawValue == "erasure_expr" || expression.rawValue == "call_expr" ||
-                    expression.rawValue == "tuple_expr" || expression.rawValue == "tuple_shuffle_expr" || expression.rawValue == "paren_expr") &&
-                    line == range.end.line && column == range.end.column {
-                    skip = true
-                    semicolonNeeded = true
-                    return
-                }
-            }
-            return semicolonNeeded
-        }
-
-        private func isSemicolonRequired(startIndex index: Int, tokens: [Instrumentor.Formatter.Token]) -> Bool {
-            var i = index
-            while index >= 0 {
-                let token = tokens[i]
-                switch token.type {
-                case .token:
-                    switch token.value {
-                    case "}":
-                        return true
-                    default:
-                        return false
-                    }
-                case .indent(_), .newline:
-                    break
-                case .string:
-                    return false
-                }
-                i -= 1
-            }
-            return false
-        }
-
-        private func canAppendSemicolon(startIndex index: Int, tokens: [Instrumentor.Formatter.Token]) -> Bool {
-            loop: for i in index..<tokens.count {
-                let token = tokens[i]
-                switch token.type {
-                case .token:
-                    switch token.value {
-                    case "(", ")", "[", "]", "{", "}", ",", ".", ":", ";":
-                        return false
-                    default:
-                        break loop
-                    }
-                case .indent(_), .newline:
-                    break
-                default:
-                    break loop
-                }
-            }
-            return true
-        }
-
-        private func isAbleToAppendSemicolon(startIndex index: Int, tokens: [Instrumentor.Formatter.Token], line l: Int, column c: Int, expression: Expression) -> Bool {
-            var line = l
-            var column = c
-
-            loop: for i in index..<tokens.count {
-                let token = tokens[i]
-                switch token.type {
-                case .token:
-                    column += 1
-                    break loop
-                case .string:
-                    column += 1
-                    break loop
-                case .indent(let count):
-                    column += count
-                case .newline:
-                    column = 0
-                    line += 1
-                }
-            }
-
-            var isAbleToAppendSemicolon = true
-            traverse(expression) { (expression, skip) in
-                guard let location = expression.location else {
-                    return
-                }
-                if (expression.rawValue == "binary_expr") {
-                    if line == location.line && column == location.column {
-                        skip = true
-                        isAbleToAppendSemicolon = false
-                        return
-                    }
-                }
-            }
-            return isAbleToAppendSemicolon
-        }
-
-        class Token {
-            enum TokenType {
-                case token
-                case string
-                case indent(Int)
-                case newline
-            }
-
-            var type: TokenType
-            var value: String
-
-            init(type: TokenType, value: String) {
-                self.type = type
-                self.value = value
-            }
-        }
-    }
+struct Replacement {
+    let sourceRange: SourceRange
+    let sourceText: String
 }
