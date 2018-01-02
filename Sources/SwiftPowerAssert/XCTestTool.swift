@@ -20,8 +20,8 @@ import Foundation
 import Basic
 import SwiftPowerAssertCore
 
-struct TestCommand {
-    func run(xcarguments arguments: [String], verbose: Bool = false) throws {
+struct XCTestTool {
+    func run(arguments: [String], verbose: Bool = false) throws {
         let xcarguments: [String]
         if let first = arguments.first, first == "xcodebuild" {
             xcarguments = Array(arguments.dropFirst())
@@ -150,7 +150,7 @@ struct TestCommand {
 }
 
 private struct Xcodebuild {
-    var exec = ["/usr/bin/xcrun", "xcodebuild"]
+    let exec = ["/usr/bin/xcrun", "xcodebuild"]
 
     func build(arguments: [String]) throws {
         let command = Process(arguments: exec + ["build"] + arguments)

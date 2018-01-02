@@ -60,6 +60,8 @@ public final class SwiftPowerAssert {
             "\(buildOptions.sdkRoot)/../../../Developer/Library/Frameworks",
             "-F",
             buildOptions.builtProductsDirectory,
+            "-I",
+            buildOptions.builtProductsDirectory,
             "-dump-ast"
         ]
         return arguments + ["-primary-file", source.path] + buildOptions.dependencies.filter { $0 != source }.map { $0.path }
