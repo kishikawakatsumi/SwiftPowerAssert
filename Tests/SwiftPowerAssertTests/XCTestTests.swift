@@ -188,4 +188,47 @@ class XCTestTests: XCTestCase {
         let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
+
+    func testExtraParameters() throws {
+        let source = """
+            import XCTest
+
+            struct Bar {
+                let foo: Foo
+                var val: Int
+            }
+
+            struct Foo {
+                var val: Int
+            }
+
+            class Tests: XCTestCase {
+                @objc dynamic func testMethod() {
+                    let bar = Bar(foo: Foo(val: 2), val: 3)
+                    XCTAssertEqual(bar.val, bar.foo.val, "should equal")
+                    XCTAssertNotEqual(bar.val, bar.foo.val + 1, "should not equal")
+                }
+            }
+
+            """
+
+        let expected = """
+            XCTAssertEqual(bar.val, bar.foo.val, "should equal")
+                           |   |    |   |   |
+                           |   3    |   |   2
+                           |        |   Foo(val: 2)
+                           |        Bar(foo: main.Foo(val: 2), val: 3)
+                           Bar(foo: main.Foo(val: 2), val: 3)
+            XCTAssertNotEqual(bar.val, bar.foo.val + 1, "should not equal")
+                              |   |    |   |   |   | |
+                              |   3    |   |   2   3 1
+                              |        |   Foo(val: 2)
+                              |        Bar(foo: main.Foo(val: 2), val: 3)
+                              Bar(foo: main.Foo(val: 2), val: 3)
+
+            """
+
+        let result = TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
 }
