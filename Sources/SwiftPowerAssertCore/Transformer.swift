@@ -450,6 +450,7 @@ class Transformer {
                         .replacingOccurrences(of: "\\t", with: "\\\\t")
                         .replacingOccurrences(of: "\\r", with: "\\\\r")
                         .replacingOccurrences(of: "\\n", with: "\\\\n")
+                        .replacingOccurrences(of: "\\0", with: "\\\\0")
                 }
                 static func toString<T>(_ value: T?) -> String {
                     switch value {
@@ -516,8 +517,9 @@ class Transformer {
         let rest = restOfExpression(child, parent)
         if rest.hasPrefix("\"\"") {
             // Multiline String Literal
-            if let range = rest.range(of: "\"\"\"") {
-                return source + rest[..<range.upperBound]
+            let normalized = rest.replacingOccurrences(of: "\\\"\"\"", with: "\\\"\\\"\\\"")
+            if let range = normalized.range(of: "\"\"\"") {
+                return source + normalized[..<range.upperBound]
             }
         } else {
             var previous = ""
@@ -628,7 +630,7 @@ class Transformer {
                 }
             case .stringEscape:
                 switch character {
-                case "\"", "\\", "'", "t", "n", "r":
+                case "\"", "\\", "'", "t", "n", "r", "0":
                     mode = .string
                 default:
                     fatalError("unexpected '\(character)' in string escape")
@@ -639,8 +641,9 @@ class Transformer {
         var result = source
         if rest.hasPrefix("\"\"") {
             // Multiline String Literal
-            if let range = rest.range(of: "\"\"\"") {
-                return source + rest[..<range.upperBound]
+            let normalized = rest.replacingOccurrences(of: "\\\"\"\"", with: "\\\"\\\"\\\"")
+            if let range = normalized.range(of: "\"\"\"") {
+                return source + normalized[..<range.upperBound]
             }
         } else {
             for character in rest {
@@ -664,7 +667,7 @@ class Transformer {
                     }
                 case .stringEscape:
                     switch character {
-                    case "\"", "\\", "'", "t", "n", "r":
+                    case "\"", "\\", "'", "t", "n", "r", "0":
                         mode = .string
                         result += "\\" + String(character)
                     default:
