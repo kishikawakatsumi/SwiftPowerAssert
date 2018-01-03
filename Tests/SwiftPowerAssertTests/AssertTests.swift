@@ -1629,6 +1629,15 @@ class AssertTests: XCTestCase {
 
                     let backslash = "Backslash\\\\Backslash"
                     assert(backslash != "Backslash\\\\Backslash")
+
+                    let wiseWords = "\\"Imagination is more important than knowledge\\" - Einstein"
+                    let dollarSign = "\\u{24}"        // $,  Unicode scalar U+0024
+                    let blackHeart = "\\u{2665}"      // ♥,  Unicode scalar U+2665
+                    let sparklingHeart = "\\u{1F496}" // 💖, Unicode scalar U+1F496
+                    assert(wiseWords != "\\"Imagination is more important than knowledge\\" - Einstein")
+                    assert(dollarSign != "\\u{24}" )
+                    assert(blackHeart != "\\u{2665}")
+                    assert(sparklingHeart != "\\u{1F496}")
                 }
             }
 
@@ -1700,6 +1709,25 @@ class AssertTests: XCTestCase {
                    |         |  "Backslash\\Backslash"
                    |         false
                    "Backslash\\Backslash"
+            assert(wiseWords != "\\"Imagination is more important than knowledge\\" - Einstein")
+                   |         |  |
+                   |         |  "\\"Imagination is more important than knowledge\\" - Einstein"
+                   |         false
+                   "\\"Imagination is more important than knowledge\\" - Einstein"
+            assert(dollarSign != "$" )
+                   |          |  |
+                   "$"        |  "$"
+                              false
+            assert(blackHeart != "♥")
+                   |          |  |
+                   |          |  "♥"
+                   |          false
+                   "♥"
+            assert(sparklingHeart != "💖")
+                   |              |  |
+                   |              |  "💖"
+                   |              false
+                   "💖"
 
             """
 
