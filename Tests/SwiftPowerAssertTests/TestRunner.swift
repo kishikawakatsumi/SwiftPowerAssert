@@ -74,7 +74,6 @@ class TestRunner {
         try! __DisplayWidth.myself.write(toFile: utilitiesFilePath, atomically: true, encoding: .utf8)
         let main = """
             Tests().testMethod()
-
             """
         try! main.write(toFile: mainFilePath, atomically: true, encoding: .utf8)
     }

@@ -172,9 +172,9 @@ class Tokenizer {
                 }
             case .stringEscape:
                 switch character {
-                case "\"", "\\", "'", "t", "n", "r":
+                case "\"", "\\", "'", "t", "n", "r", "0":
                     state.mode = .string
-                    state.storage += String(character)
+                    state.storage += "\\" + String(character)
                 default:
                     fatalError("unexpected '\(character)' in string escape")
                 }

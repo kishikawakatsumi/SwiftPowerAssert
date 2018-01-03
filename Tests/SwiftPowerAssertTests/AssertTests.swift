@@ -1617,6 +1617,18 @@ class AssertTests: XCTestCase {
 
                     let helpText = "OPTIONS:\\n  --build-path\\t\\tSpecify build/cache directory [default: ./.build]"
                     assert(helpText != "OPTIONS:\\n  --build-path\\t\\tSpecify build/cache directory [default: ./.build]")
+
+                    let nullCharacter = "Null character\\0Null character"
+                    assert(nullCharacter != "Null character\\0Null character")
+
+                    let lineFeed = "Line feed\\nLine feed"
+                    assert(lineFeed != "Line feed\\nLine feed")
+
+                    let carriageReturn = "Carriage Return\\rCarriage Return"
+                    assert(carriageReturn != "Carriage Return\\rCarriage Return")
+
+                    let backslash = "Backslash\\\\Backslash"
+                    assert(backslash != "Backslash\\\\Backslash")
                 }
             }
 
@@ -1668,6 +1680,26 @@ class AssertTests: XCTestCase {
                    |        |  "OPTIONS:\\n  --build-path\\t\\tSpecify build/cache directory [default: ./.build]"
                    |        false
                    "OPTIONS:\\n  --build-path\\t\\tSpecify build/cache directory [default: ./.build]"
+            assert(nullCharacter != "Null character\\0Null character")
+                   |             |  |
+                   |             |  "Null character\\0Null character"
+                   |             false
+                   "Null character\\0Null character"
+            assert(lineFeed != "Line feed\\nLine feed")
+                   |        |  |
+                   |        |  "Line feed\\nLine feed"
+                   |        false
+                   "Line feed\\nLine feed"
+            assert(carriageReturn != "Carriage Return\\rCarriage Return")
+                   |              |  |
+                   |              |  "Carriage Return\\rCarriage Return"
+                   |              false
+                   "Carriage Return\\rCarriage Return"
+            assert(backslash != "Backslash\\Backslash")
+                   |         |  |
+                   |         |  "Backslash\\Backslash"
+                   |         false
+                   "Backslash\\Backslash"
 
             """
 
@@ -1681,15 +1713,24 @@ class AssertTests: XCTestCase {
 
             class Tests: XCTestCase {
                 func testMethod() {
-                    let multilineLiteral = \"\"\"
+                    let multilineLiteral = \"""
                         Lorem ipsum dolor sit amet, consectetur adipiscing elit,
                         sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-                        \"\"\"
-                    assert(multilineLiteral != \"\"\"
+                        \"""
+                    assert(multilineLiteral != \"""
                         Lorem ipsum dolor sit amet, consectetur adipiscing elit,
                         sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-                        \"\"\")
+                        \""")
                     assert(multilineLiteral != multilineLiteral)
+
+                    let threeDoubleQuotationMarks = \"""
+                        Escaping the first quotation mark \\\"""
+                        Escaping all three quotation marks \\\"\\\"\\\"
+                        \"""
+                    assert(threeDoubleQuotationMarks != \"""
+                        Escaping the first quotation mark \\\"""
+                        Escaping all three quotation marks \\\"\\\"\\\"
+                        \""")
                 }
             }
 
@@ -1706,6 +1747,11 @@ class AssertTests: XCTestCase {
                    |                |  "Lorem ipsum dolor sit amet, consectetur adipiscing elit,\\nsed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
                    |                false
                    "Lorem ipsum dolor sit amet, consectetur adipiscing elit,\\nsed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+            assert(threeDoubleQuotationMarks != "Escaping the first quotation mark \\"\\"\\"\\nEscaping all three quotation marks \\"\\"\\"")
+                   |                         |  |
+                   |                         |  "Escaping the first quotation mark \\"\\"\\"\\nEscaping all three quotation marks \\"\\"\\""
+                   |                         false
+                   "Escaping the first quotation mark \\"\\"\\"\\nEscaping all three quotation marks \\"\\"\\""
 
             """
 

@@ -26,6 +26,7 @@ class Formatter {
             case string
             case multilineString
             case stringEscape
+            case stringEscapeInMultilineString
             case newline
             case indent
         }
@@ -36,6 +37,7 @@ class Formatter {
         var input: String
         var openingDelimiterCount = 0
         var closingDelimiterCount = 0
+        var skipEscapedQuoteCount = 0
 
         init(input: String) {
             self.input = input
@@ -108,7 +110,13 @@ class Formatter {
             case .multilineString:
                 switch character {
                 case "\"":
-                    if state.openingDelimiterCount == 3 {
+                    if state.skipEscapedQuoteCount > 0 && state.skipEscapedQuoteCount < 2 {
+                        state.skipEscapedQuoteCount += 1
+                        state.storage += "\\" + String(character)
+                    } else if state.skipEscapedQuoteCount == 2 {
+                        state.skipEscapedQuoteCount = 0
+                        state.storage += "\\" + String(character)
+                    } else if state.openingDelimiterCount == 3 {
                         if state.closingDelimiterCount == 2 {
                             state.tokens.append(Token(type: .string, value: normalizeMultilineLiteral(state.storage)))
                             state.mode = .plain
@@ -122,14 +130,37 @@ class Formatter {
                         state.openingDelimiterCount += 1
                     }
                 case "\\":
-                    state.mode = .stringEscape
+                    state.mode = .stringEscapeInMultilineString
                 default:
                     state.storage += String(character)
                 }
             case .stringEscape:
                 switch character {
-                case "\"", "\\", "'", "t", "n", "r":
+                case "\"":
                     state.mode = .string
+                    state.storage += "\\" + String(character)
+                case "\\", "'", "t", "n", "r", "0":
+                    state.mode = .string
+                    state.storage += "\\" + String(character)
+                default:
+                    fatalError("unexpected '\(character)' in string escape")
+                }
+            case .stringEscapeInMultilineString:
+                switch character {
+                case "\"":
+                    if index + 2 < input.count {
+                        let startIndex = input.index(input.startIndex, offsetBy: index)
+                        if input[startIndex...input.index(startIndex, offsetBy: 2)] == "\"\"\"" {
+                            state.mode = .multilineString
+                            state.storage += "\\" + String(character)
+                            state.skipEscapedQuoteCount = 1
+                            break
+                        }
+                    }
+                    state.mode = .multilineString
+                    state.storage += "\\" + String(character)
+                case "\\", "'", "t", "n", "r", "0":
+                    state.mode = .multilineString
                     state.storage += "\\" + String(character)
                 default:
                     fatalError("unexpected '\(character)' in string escape")
@@ -288,8 +319,10 @@ class Formatter {
     private func escapeString(_ value: String) -> String {
         return value
             .replacingOccurrences(of: "\"", with: "\\\\\"")
-            .replacingOccurrences(of: "\\n", with: "\\\\n")
             .replacingOccurrences(of: "\\t", with: "\\\\t")
+            .replacingOccurrences(of: "\\r", with: "\\\\r")
+            .replacingOccurrences(of: "\\n", with: "\\\\n")
+            .replacingOccurrences(of: "\\0", with: "\\\\0")
     }
 
     private func isSemicolonNeeded(line: Int, column: Int, expression: Expression) -> Bool {
