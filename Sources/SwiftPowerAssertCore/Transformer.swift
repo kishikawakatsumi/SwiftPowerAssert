@@ -496,16 +496,9 @@ class Transformer {
                     }
                     message += "\\n"
                 }
-                if \(inUnitTests) {
-                    print(message, terminator: "")
-                } else {
-                    if condition == \(failureCondition) {
-                        XCTFail("\\n" + message, line: \(expression.location.line + 1))
-                    }
-                    if \(verbose) {
-                        print(message, terminator: "")
-                    }
-                }
+                \(inUnitTests ? "print(message, terminator: \"\")" : "")
+                \(!inUnitTests ? "condition == \(failureCondition) ? XCTFail(\"\\n\" + message, line: \(expression.location.line + 1)) : ()" : "")
+                \(!inUnitTests && verbose ? "print(message, terminator: \"\")" : "")
             }
         }
 
