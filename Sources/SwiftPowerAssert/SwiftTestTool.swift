@@ -22,9 +22,40 @@ import SwiftPowerAssertCore
 
 struct SwiftTestTool {
     func run(arguments: [String], verbose: Bool = false) throws {
+        var swiftTestArguments: [String]
+        if let first = arguments.first, first == "swift" {
+            swiftTestArguments = Array(arguments.dropFirst())
+        } else {
+            swiftTestArguments = arguments
+        }
+
+        if let command = swiftTestArguments.first, !command.hasPrefix("-") {
+            guard command == "test" else {
+                throw SwiftPowerAssertError.invalidArgument("only 'test' swift subcommand is supported.")
+            }
+            swiftTestArguments = Array(swiftTestArguments.dropFirst())
+        }
+
+        var iterator = swiftTestArguments.makeIterator()
+        var configurationArgument: String?
+        var buildPathArgument: String?
+        var packagePathArgument: String?
+        while let option = iterator.next() {
+            switch option {
+            case "--configuration", "-c":
+                configurationArgument = iterator.next()
+            case "--build-path":
+                buildPathArgument = iterator.next()
+            case "--package-path":
+                packagePathArgument = iterator.next()
+            default:
+                break
+            }
+        }
+
         print("Reading project settings...")
         let swiftPackage = SwiftPackage()
-        let rawPackageDescription = try swiftPackage.describe()
+        let rawPackageDescription = try swiftPackage.describe(packagePath: packagePathArgument, buildPath: buildPathArgument)
 
         let packageDescription = try JSONDecoder().decode(PackageDescription.self, from: rawPackageDescription.data(using: .utf8)!)
         let testTypeTergets = packageDescription.targets.filter { $0.type == "test" }
@@ -34,7 +65,17 @@ struct SwiftTestTool {
         }
 
         let swiftBuild = SwiftBuild()
-        try swiftBuild.build(arguments: [])
+        var swiftBuildArgument = [String]()
+        if let configurationArgument = configurationArgument {
+            swiftBuildArgument.append(contentsOf: ["--configuration", configurationArgument])
+        }
+        if let buildPathArgument = buildPathArgument {
+            swiftBuildArgument.append(contentsOf: ["--build-path", buildPathArgument])
+        }
+        if let packagePathArgument = packagePathArgument {
+            swiftBuildArgument.append(contentsOf: ["--package-path", packagePathArgument])
+        }
+        try swiftBuild.build(arguments: swiftBuildArgument)
 
         let temporaryDirectory: TemporaryDirectory
         do {
@@ -47,10 +88,26 @@ struct SwiftTestTool {
             restoreOriginalSourceFiles(from: backupFiles)
         }
 
-        let buildPath = URL(fileURLWithPath: "./.build")
+        let buildPath: URL
+        if let buildPathArgument = buildPathArgument {
+            buildPath = URL(fileURLWithPath: buildPathArgument)
+        } else {
+            if let packagePathArgument = packagePathArgument {
+                buildPath = URL(fileURLWithPath: packagePathArgument).appendingPathComponent(".build")
+            } else {
+                buildPath = URL(fileURLWithPath: "./.build")
+            }
+        }
+
         let hostTriple = Triple.hostTriple
         let triple = hostTriple.tripleString
-        let configuration = "debug"
+
+        let configuration: String
+        if let configurationArgument = configurationArgument {
+            configuration = configurationArgument
+        } else {
+            configuration = "debug"
+        }
 
         let sdk = SDK.macosx
         let sdkName = sdk.name
@@ -98,7 +155,7 @@ struct SwiftTestTool {
 
             print("Testing \(testTypeTerget.name) ...")
             let swiftTest = SwiftTest()
-            try swiftTest.test(arguments: arguments)
+            try swiftTest.test(arguments: swiftTestArguments)
         }
     }
 
@@ -117,13 +174,24 @@ struct SwiftTestTool {
 private struct SwiftPackage {
     let exec = ["/usr/bin/xcrun", "swift", "package"]
 
-    func describe() throws -> String {
-        let command = Process(arguments: exec + ["describe", "--type", "json"])
+    func describe(packagePath: String?, buildPath: String?) throws -> String {
+        var packageOptions = [String]()
+        if let packagePath = packagePath {
+            packageOptions.append(contentsOf: ["--package-path", packagePath])
+        }
+        if let buildPath = buildPath {
+            packageOptions.append(contentsOf: ["--build-path", buildPath])
+        }
+        let command = Process(arguments: exec + packageOptions + ["describe", "--type", "json"])
         try! command.launch()
         let result = try! command.waitUntilExit()
         let output = try! result.utf8Output()
         switch result.exitStatus {
         case .terminated(let code) where code == 0:
+            let index = output.index { $0 == "{" }
+            if let index = index {
+                return String(output[index...])
+            }
             return output
         default:
             throw SwiftPowerAssertError.taskError("failed to run the following command: '\(command.arguments.joined(separator: " "))'")
@@ -148,7 +216,7 @@ private struct SwiftBuild {
 }
 
 private struct SwiftTest {
-    let exec = ["/usr/bin/xcrun", "swift"]
+    let exec = ["/usr/bin/xcrun", "swift", "test"]
 
     func test(arguments: [String]) throws {
         let command = Process(arguments: exec + arguments, redirectOutput: false)
