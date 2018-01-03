@@ -1674,4 +1674,42 @@ class AssertTests: XCTestCase {
         let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
+
+    func testMultilineStringLiterals() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let multilineLiteral = \"\"\"
+                        Lorem ipsum dolor sit amet, consectetur adipiscing elit,
+                        sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+                        \"\"\"
+                    assert(multilineLiteral != \"\"\"
+                        Lorem ipsum dolor sit amet, consectetur adipiscing elit,
+                        sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+                        \"\"\")
+                    assert(multilineLiteral != multilineLiteral)
+                }
+            }
+
+            """
+
+        let expected = """
+            assert(multilineLiteral != "Lorem ipsum dolor sit amet, consectetur adipiscing elit,\\nsed do eiusmod tempor incididunt ut labore et dolore magna aliqua.")
+                   |                |  |
+                   |                |  "Lorem ipsum dolor sit amet, consectetur adipiscing elit,\\nsed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+                   |                false
+                   "Lorem ipsum dolor sit amet, consectetur adipiscing elit,\\nsed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+            assert(multilineLiteral != multilineLiteral)
+                   |                |  |
+                   |                |  "Lorem ipsum dolor sit amet, consectetur adipiscing elit,\\nsed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+                   |                false
+                   "Lorem ipsum dolor sit amet, consectetur adipiscing elit,\\nsed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+
+            """
+
+        let result = TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
 }
