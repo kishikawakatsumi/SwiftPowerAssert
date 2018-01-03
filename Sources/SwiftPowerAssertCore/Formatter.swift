@@ -95,15 +95,9 @@ class Formatter {
                 }
             case .stringEscape:
                 switch character {
-                case "\"", "\\":
+                case "\"", "\\", "'", "t", "n", "r":
                     state.mode = .string
                     state.storage += "\\" + String(character)
-                case "n":
-                    state.mode = .string
-                    state.storage += "\n"
-                case "t":
-                    state.mode = .string
-                    state.storage += "\t"
                 default:
                     fatalError("unexpected '\(character)' in string escape")
                 }
@@ -208,23 +202,6 @@ class Formatter {
         return formatted
     }
 
-    func escaped(tokens: [Token]) -> String {
-        var formatted = ""
-        for token in tokens {
-            switch token.type {
-            case .token:
-                formatted += token.value.replacingOccurrences(of: "\\", with: "\\\\")
-            case .string:
-                formatted += "\\\"" + token.value.replacingOccurrences(of: "\"", with: "\\\\\"") + "\\\""
-            case .indent(_):
-                break
-            case .newline:
-                formatted += " "
-            }
-        }
-        return formatted
-    }
-
     func escaped(tokens: [Token], withHint expression: Expression) -> String {
         let range = expression.range
         var line = range!.start.line
@@ -238,7 +215,7 @@ class Formatter {
                 formatted += value.replacingOccurrences(of: "\\", with: "\\\\")
                 column += value.utf8.count
             case .string:
-                formatted += "\\\"" + token.value.replacingOccurrences(of: "\"", with: "\\\\\"") + "\\\""
+                formatted += "\\\"" + escapeString(token.value) + "\\\""
                 column += token.value.utf8.count + 2
             case .indent(let count):
                 column += count
@@ -255,15 +232,11 @@ class Formatter {
         return formatted
     }
 
-    private func traverse(_ expression: Expression, closure: (_ expression: Expression, _ skipChildren: inout Bool) -> ()) {
-        var skip = false
-        closure(expression, &skip)
-        if skip {
-            return
-        }
-        for expression in expression.expressions {
-            traverse(expression, closure: closure)
-        }
+    private func escapeString(_ value: String) -> String {
+        return value
+            .replacingOccurrences(of: "\"", with: "\\\\\"")
+            .replacingOccurrences(of: "\\n", with: "\\\\n")
+            .replacingOccurrences(of: "\\t", with: "\\\\t")
     }
 
     private func isSemicolonNeeded(line: Int, column: Int, expression: Expression) -> Bool {
@@ -360,6 +333,17 @@ class Formatter {
             }
         }
         return isAbleToAppendSemicolon
+    }
+
+    private func traverse(_ expression: Expression, closure: (_ expression: Expression, _ skipChildren: inout Bool) -> ()) {
+        var skip = false
+        closure(expression, &skip)
+        if skip {
+            return
+        }
+        for expression in expression.expressions {
+            traverse(expression, closure: closure)
+        }
     }
 
     class Token {

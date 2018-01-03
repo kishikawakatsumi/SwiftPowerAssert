@@ -33,7 +33,7 @@ class XCTestTests: XCTestCase {
             }
 
             class Tests: XCTestCase {
-                @objc dynamic func testMethod() {
+                func testMethod() {
                     let bar = Bar(foo: Foo(val: 2), val: 3)
                     XCTAssert(bar.val == bar.foo.val)
                     XCTAssertTrue(bar.val == bar.foo.val)
@@ -86,7 +86,7 @@ class XCTestTests: XCTestCase {
             }
 
             class Tests: XCTestCase {
-                @objc dynamic func testMethod() {
+                func testMethod() {
                     let bar = Bar(foo: Foo(val: 2), val: 3)
                     XCTAssertEqual(bar.val, bar.foo.val)
                     XCTAssertNotEqual(bar.val, bar.foo.val + 1)
@@ -129,7 +129,7 @@ class XCTestTests: XCTestCase {
             }
 
             class Tests: XCTestCase {
-                @objc dynamic func testMethod() {
+                func testMethod() {
                     let bar = Bar(foo: Foo(val: 2), val: 3)
                     XCTAssertGreaterThan(bar.foo.val, bar.val)
                     XCTAssertGreaterThan(bar.foo.val + 1, bar.val)
@@ -203,7 +203,7 @@ class XCTestTests: XCTestCase {
             }
 
             class Tests: XCTestCase {
-                @objc dynamic func testMethod() {
+                func testMethod() {
                     let bar = Bar(foo: Foo(val: 2), val: 3)
                     XCTAssertEqual(bar.val, bar.foo.val, "should equal")
                     XCTAssertNotEqual(bar.val, bar.foo.val + 1, "should not equal")

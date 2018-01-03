@@ -166,17 +166,18 @@ class Transformer {
         var values = [Int: String]()
         let formatter = Formatter()
 
-        let tupleExpression = findFirst(expression) { $0.rawValue == "tuple_expr" }
-        let sentinel = findSentinelExpression(expression: tupleExpression!, numberOfParameters)
+        let parenExpression = findFirst(expression) { $0.rawValue == "tuple_shuffle_expr" } ?? findFirst(expression) { $0.rawValue == "paren_expr" }
+        let sentinelExpression = findSentinelExpression(expression: parenExpression!, numberOfParameters)
 
         traverse(expression) { (childExpression, skip) in
-            if childExpression == sentinel {
+            if childExpression == sentinelExpression {
                 skip = true
                 return
             }
             guard let wholeRange = expression.range, let valueRange = childExpression.range, wholeRange != valueRange else {
                 return
             }
+            
             let wholeExpressionSource = sourceFile[wholeRange]
             let valueExpressionSource = sourceFile[valueRange]
 
@@ -287,7 +288,7 @@ class Transformer {
     func recordValuesCodeFragment(values: [Int: String]) -> String {
         var code = ""
         for (key, value) in values {
-            code += "valueColumns[\(key)] = \"\\(__toString(\(value)))\"\n"
+            code += "valueColumns[\(key)] = __Util.toString(\(value))\n"
         }
         return code
     }
@@ -443,12 +444,19 @@ class Transformer {
                 static func greaterThanOrEqual<T>(_ parameters: (lhs: T, rhs: T, message: String, file: StaticString, line: UInt)) -> Bool where T: Comparable {
                     return greaterThanOrEqual((parameters.lhs, parameters.rhs))
                 }
-            }
-            func __toString<T>(_ value: T?) -> String {
-                switch value {
-                case .some(let v) where v is String ||  v is Selector: return "\\"\\(v)\\"".replacingOccurrences(of: "\\n", with: " ")
-                case .some(let v): return "\\(v)".replacingOccurrences(of: "\\n", with: " ")
-                case .none: return "nil"
+                static func value(_ value: String) -> String {
+                    return value
+                        .replacingOccurrences(of: "\\"", with: "\\\\\\"")
+                        .replacingOccurrences(of: "\\t", with: "\\\\t")
+                        .replacingOccurrences(of: "\\r", with: "\\\\r")
+                        .replacingOccurrences(of: "\\n", with: "\\\\n")
+                }
+                static func toString<T>(_ value: T?) -> String {
+                    switch value {
+                    case .some(let v) where v is String || v is Selector: return "\\"\\(__Util.value("\\(v)"))\\""
+                    case .some(let v): return "\\(v)".replacingOccurrences(of: "\\n", with: " ")
+                    case .none: return "nil"
+                    }
                 }
             }
             var valueColumns = [Int: String]()
@@ -586,13 +594,69 @@ class Transformer {
     }
 
     private func extendExpression(_ rest: String, _ source: String) -> String {
+        enum Mode {
+            case plain
+            case string
+            case stringEscape
+        }
+        var mode = Mode.plain
+
+        for character in source {
+            switch mode {
+            case .plain:
+                switch character {
+                case "\"":
+                    mode = .string
+                default:
+                    break
+                }
+            case .string:
+                switch character {
+                case "\"":
+                    mode = .plain
+                case "\\":
+                    mode = .stringEscape
+                default:
+                    break
+                }
+            case .stringEscape:
+                switch character {
+                case "\"", "\\", "'", "t", "n", "r":
+                    mode = .string
+                default:
+                    fatalError("unexpected '\(character)' in string escape")
+                }
+            }
+        }
+
         var result = source
         for character in rest {
-            switch character {
-            case ".", ",", " ", "\t", "\n", "(", "[", "{", ")", "]", "}", ":", ";", "?":
-                return result
-            default:
-                result += String(character)
+            switch mode {
+            case .plain:
+                switch character {
+                case ".", ",", " ", "\"", "\t", "\n", "(", "[", "{", ")", "]", "}", ":", ";", "?":
+                    return result
+                default:
+                    result += String(character)
+                }
+            case .string:
+                switch character {
+                case "\"":
+                    result += String(character)
+                    return result
+                case "\\":
+                    mode = .stringEscape
+                default:
+                    result += String(character)
+                }
+            case .stringEscape:
+                switch character {
+                case "\"", "\\", "'", "t", "n", "r":
+                    mode = .string
+                    result += "\\" + String(character)
+                default:
+                    fatalError("unexpected '\(character)' in string escape")
+                }
             }
         }
         return result

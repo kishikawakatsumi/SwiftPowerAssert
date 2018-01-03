@@ -33,7 +33,7 @@ class AssertTests: XCTestCase {
             }
 
             class Tests: XCTestCase {
-                @objc dynamic func testMethod() {
+                func testMethod() {
                     let bar = Bar(foo: Foo(val: 2), val: 3)
                     assert(bar.val == bar.foo.val)
                 }
@@ -313,7 +313,7 @@ class AssertTests: XCTestCase {
             }
 
             class Tests: XCTestCase {
-                @objc dynamic func testMethod() {
+                func testMethod() {
                     let bar = Bar(foo: Foo(val: 2), val: 3)
                     assert(bar.val == bar.foo.val)
                     assert(bar
@@ -360,7 +360,7 @@ class AssertTests: XCTestCase {
             import XCTest
 
             class Tests: XCTestCase {
-                @objc dynamic func testMethod() {
+                func testMethod() {
                     let zero = 0
                     let one = 1
                     let two = 2
@@ -593,7 +593,7 @@ class AssertTests: XCTestCase {
             }
 
             class Tests: XCTestCase {
-                @objc dynamic func testMethod() {
+                func testMethod() {
                     let landmark = Landmark(name: "Tokyo Tower",
                                             foundingYear: 1957,
                                             location: Coordinate(latitude: 35.658581, longitude: 139.745438))
@@ -610,21 +610,21 @@ class AssertTests: XCTestCase {
         let expected = """
             assert(try! JSONEncoder().encode(landmark) == "{ name: \\"Tokyo Tower\\" }".data(using: String.Encoding.utf8))
                         |             |      |         |  |                           |                           |
-                        |             |      |         |  "{ name: "Tokyo Tower" }"   23 bytes                    Unicode (UTF-8)
+                        |             |      |         |  "{ name: \\"Tokyo Tower\\" }" 23 bytes                    Unicode (UTF-8)
                         |             |      |         false
                         |             |      Landmark(name: "Tokyo Tower", foundingYear: 1957, location: main.Coordinate(latitude: 35.658580999999998, longitude: 139.74543800000001))
                         |             99 bytes
                         Foundation.JSONEncoder
             assert(try! JSONEncoder().encode(landmark) == "{ name: \\"Tokyo Tower\\" }".data(using: .utf8))
                         |             |      |         |  |                           |            |
-                        |             |      |         |  "{ name: "Tokyo Tower" }"   23 bytes     Unicode (UTF-8)
+                        |             |      |         |  "{ name: \\"Tokyo Tower\\" }" 23 bytes     Unicode (UTF-8)
                         |             |      |         false
                         |             |      Landmark(name: "Tokyo Tower", foundingYear: 1957, location: main.Coordinate(latitude: 35.658580999999998, longitude: 139.74543800000001))
                         |             99 bytes
                         Foundation.JSONEncoder
             assert(try! "{ name: \\"Tokyo Tower\\" }".data(using: String.Encoding.utf8) == JSONEncoder().encode(landmark))
                         |                           |                           |     |  |             |      |
-                        "{ name: "Tokyo Tower" }"   23 bytes                    |     |  |             |      Landmark(name: "Tokyo Tower", foundingYear: 1957, location: main.Coordinate(latitude: 35.658580999999998, longitude: 139.74543800000001))
+                        "{ name: \\"Tokyo Tower\\" }" 23 bytes                    |     |  |             |      Landmark(name: "Tokyo Tower", foundingYear: 1957, location: main.Coordinate(latitude: 35.658580999999998, longitude: 139.74543800000001))
                                                                                 |     |  |             99 bytes
                                                                                 |     |  Foundation.JSONEncoder
                                                                                 |     false
@@ -1408,7 +1408,7 @@ class AssertTests: XCTestCase {
             }
 
             class Tests: XCTestCase {
-                @objc dynamic func testMethod() {
+                func testMethod() {
                     let bar = Bar(foo: Foo(val: 2), val: 3)
                     #if swift(>=3.2)
                         assert(bar.val == bar.foo.val)
@@ -1559,6 +1559,115 @@ class AssertTests: XCTestCase {
                    |     "[1, 2, 3]" true      "["  |  false |  |     "[1, 2, 3]" false     "Hello"  |  true
                    [1, 2, 3]                        false    |  [1, 2, 3]                            false
                                                              false
+
+            """
+
+        let result = TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
+    func testStringContainsNewlines() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let loremIpsum = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+                    assert(loremIpsum ==
+                        "Lorem ipsum dolor sit amet,\\nconsectetur adipiscing elit,")
+                }
+            }
+
+            """
+
+        let expected = """
+            assert(loremIpsum == "Lorem ipsum dolor sit amet,\\nconsectetur adipiscing elit,")
+                   |          |  |
+                   |          |  "Lorem ipsum dolor sit amet,\\nconsectetur adipiscing elit,"
+                   |          false
+                   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+
+            """
+
+        let result = TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
+    func testStringContainsEscapeSequences() throws {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let lyric1 = "Feet, don't fail me now."
+                    assert(lyric1 != "Feet, don't fail me now.")
+                    assert(lyric1 != "Feet, don\\'t fail me now.")
+
+                    let lyric2 = "Feet, don\\'t fail me now."
+                    assert(lyric2 != "Feet, don't fail me now.")
+                    assert(lyric2 != "Feet, don\\'t fail me now.")
+
+                    let nestedQuote1 = "My mother said, \\"The baby started talking today. The baby said, 'Mama.'\\""
+                    assert(nestedQuote1 != "My mother said, \\"The baby started talking today. The baby said, 'Mama.'\\"")
+                    assert(nestedQuote1 != "My mother said, \\"The baby started talking today. The baby said, \\'Mama.\\'\\"")
+
+                    let nestedQuote2 = "My mother said, \\"The baby started talking today. The baby said, \\'Mama.\\'\\""
+                    assert(nestedQuote2 != "My mother said, \\"The baby started talking today. The baby said, 'Mama.'\\"")
+                    assert(nestedQuote2 != "My mother said, \\"The baby started talking today. The baby said, \\'Mama.\\'\\"")
+
+                    let helpText = "OPTIONS:\\n  --build-path\\t\\tSpecify build/cache directory [default: ./.build]"
+                    assert(helpText != "OPTIONS:\\n  --build-path\\t\\tSpecify build/cache directory [default: ./.build]")
+                }
+            }
+
+            """
+
+        let expected = """
+            assert(lyric1 != "Feet, don't fail me now.")
+                   |      |  |
+                   |      |  "Feet, don't fail me now."
+                   |      false
+                   "Feet, don't fail me now."
+            assert(lyric1 != "Feet, don't fail me now.")
+                   |      |  |
+                   |      |  "Feet, don't fail me now."
+                   |      false
+                   "Feet, don't fail me now."
+            assert(lyric2 != "Feet, don't fail me now.")
+                   |      |  |
+                   |      |  "Feet, don't fail me now."
+                   |      false
+                   "Feet, don't fail me now."
+            assert(lyric2 != "Feet, don't fail me now.")
+                   |      |  |
+                   |      |  "Feet, don't fail me now."
+                   |      false
+                   "Feet, don't fail me now."
+            assert(nestedQuote1 != "My mother said, \\"The baby started talking today. The baby said, 'Mama.'\\"")
+                   |            |  |
+                   |            |  "My mother said, \\"The baby started talking today. The baby said, 'Mama.'\\""
+                   |            false
+                   "My mother said, \\"The baby started talking today. The baby said, 'Mama.'\\""
+            assert(nestedQuote1 != "My mother said, \\"The baby started talking today. The baby said, 'Mama.'\\"")
+                   |            |  |
+                   |            |  "My mother said, \\"The baby started talking today. The baby said, 'Mama.'\\""
+                   |            false
+                   "My mother said, \\"The baby started talking today. The baby said, 'Mama.'\\""
+            assert(nestedQuote2 != "My mother said, \\"The baby started talking today. The baby said, 'Mama.'\\"")
+                   |            |  |
+                   |            |  "My mother said, \\"The baby started talking today. The baby said, 'Mama.'\\""
+                   |            false
+                   "My mother said, \\"The baby started talking today. The baby said, 'Mama.'\\""
+            assert(nestedQuote2 != "My mother said, \\"The baby started talking today. The baby said, 'Mama.'\\"")
+                   |            |  |
+                   |            |  "My mother said, \\"The baby started talking today. The baby said, 'Mama.'\\""
+                   |            false
+                   "My mother said, \\"The baby started talking today. The baby said, 'Mama.'\\""
+            assert(helpText != "OPTIONS:\\n  --build-path\\t\\tSpecify build/cache directory [default: ./.build]")
+                   |        |  |
+                   |        |  "OPTIONS:\\n  --build-path\\t\\tSpecify build/cache directory [default: ./.build]"
+                   |        false
+                   "OPTIONS:\\n  --build-path\\t\\tSpecify build/cache directory [default: ./.build]"
 
             """
 

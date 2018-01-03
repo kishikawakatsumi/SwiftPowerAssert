@@ -22,22 +22,34 @@ import Utility
 import SwiftPowerAssertCore
 
 do {
-    let parser = ArgumentParser(commandName: "swift-power-assert", usage: "SUBCOMMAND", overview: "SwiftPowerAssert, provide diagrammed assertions in Swift")
+    let parser = ArgumentParser(commandName: "swift-power-assert", usage: "[options] subcommand [options]", overview: "Provide diagrammed assertions")
+    let verbose = parser.add(option: "--verbose", kind: Bool.self, usage: "Show more debugging information")
 
-    let test = parser.add(subparser: "test", overview: "Run XCTest with power assertion enabled.")
-    let verbose = test.add(option: "--verbose", kind: Bool.self, usage: "Show more debugging information")
-    let xcargs = test.add(option: "--xcargs", shortName: "-x", kind: [String].self, strategy: .remaining, usage: "swift-power-assert test --xcargs -workspace <workspacename> -scheme <schemeName> [<buildaction>]...")
+    let test = parser.add(subparser: "test", overview: "Run swift test with power assertion")
+    let xtest = test.add(option: "-Xtest", kind: [String].self, strategy: .remaining, usage: "Arguments to pass to 'swift test' command")
+
+    let xctest = parser.add(subparser: "xctest", overview: "Run XCTest with power assertion.")
+    let xxcodebuild = xctest.add(option: "-Xxcodebuild", kind: [String].self, strategy: .remaining, usage: "Arguments to pass to 'xcodebuild' command")
 
     let arguments = Array(CommandLine.arguments.dropFirst())
     let result = try parser.parse(arguments)
 
+    let isVerbose = result.get(verbose) ?? false
+
     switch result.subparser(parser) {
-    case let subcommand? where subcommand == "test":
-        if let xcodeArguments = result.get(xcargs) {
-            let command = TestCommand()
-            try command.run(xcarguments: xcodeArguments, verbose: result.get(verbose) ?? false)
+    case "test"?:
+        if let arguments = result.get(xtest) {
+            let command = SwiftTestTool()
+            try command.run(arguments: arguments, verbose: isVerbose)
         } else {
-            test.printUsage(on: stdoutStream)
+            xctest.printUsage(on: stdoutStream)
+        }
+    case "xctest"?:
+        if let arguments = result.get(xxcodebuild) {
+            let command = XCTestTool()
+            try command.run(arguments: arguments, verbose: isVerbose)
+        } else {
+            xctest.printUsage(on: stdoutStream)
         }
     default:
         parser.printUsage(on: stdoutStream)
