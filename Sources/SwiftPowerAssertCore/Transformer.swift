@@ -607,6 +607,7 @@ class Transformer {
             case plain
             case string
             case stringEscape
+            case unicodeEscape
         }
         var mode = Mode.plain
 
@@ -632,8 +633,18 @@ class Transformer {
                 switch character {
                 case "\"", "\\", "'", "t", "n", "r", "0":
                     mode = .string
+                case "u":
+                    mode = .unicodeEscape
                 default:
                     fatalError("unexpected '\(character)' in string escape")
+                }
+            case .unicodeEscape:
+                switch character {
+                case "}":
+                    mode = .string
+                    break
+                default:
+                    break
                 }
             }
         }
@@ -670,8 +681,19 @@ class Transformer {
                     case "\"", "\\", "'", "t", "n", "r", "0":
                         mode = .string
                         result += "\\" + String(character)
+                    case "u":
+                        mode = .unicodeEscape
+                        result += "\\" + String(character)
                     default:
                         fatalError("unexpected '\(character)' in string escape")
+                    }
+                case .unicodeEscape:
+                    switch character {
+                    case "}":
+                        mode = .string
+                        result += String(character)
+                    default:
+                        result += String(character)
                     }
                 }
             }

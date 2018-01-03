@@ -27,6 +27,8 @@ class Formatter {
             case multilineString
             case stringEscape
             case stringEscapeInMultilineString
+            case unicodeEscape
+            case unicodeEscapeInMultilineString
             case newline
             case indent
         }
@@ -136,14 +138,22 @@ class Formatter {
                 }
             case .stringEscape:
                 switch character {
-                case "\"":
+                case "\"", "\\", "'", "t", "n", "r", "0":
                     state.mode = .string
                     state.storage += "\\" + String(character)
-                case "\\", "'", "t", "n", "r", "0":
-                    state.mode = .string
+                case "u":
+                    state.mode = .unicodeEscape
                     state.storage += "\\" + String(character)
                 default:
                     fatalError("unexpected '\(character)' in string escape")
+                }
+            case .unicodeEscape:
+                switch character {
+                case "}":
+                    state.mode = .string
+                    state.storage += String(character)
+                default:
+                    state.storage += String(character)
                 }
             case .stringEscapeInMultilineString:
                 switch character {
@@ -162,8 +172,19 @@ class Formatter {
                 case "\\", "'", "t", "n", "r", "0":
                     state.mode = .multilineString
                     state.storage += "\\" + String(character)
+                case "u":
+                    state.mode = .unicodeEscapeInMultilineString
+                    state.storage += "\\" + String(character)
                 default:
                     fatalError("unexpected '\(character)' in string escape")
+                }
+            case .unicodeEscapeInMultilineString:
+                switch character {
+                case "}":
+                    state.mode = .multilineString
+                    state.storage += String(character)
+                default:
+                    state.storage += String(character)
                 }
             case .indent:
                 switch character {
