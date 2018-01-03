@@ -1,8 +1,6 @@
 language: objective-c
 script:
 - swift test
-after_success:
-- bash <(curl -s https://codecov.io/bash)
 matrix:
   include:
   - osx_image: xcode9.2
