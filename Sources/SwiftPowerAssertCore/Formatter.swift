@@ -24,6 +24,7 @@ class Formatter {
             case plain
             case token
             case string
+            case multilineString
             case stringEscape
             case newline
             case indent
@@ -33,6 +34,8 @@ class Formatter {
         var tokens = [Token]()
         var storage = ""
         var input: String
+        var openingDelimiterCount = 0
+        var closingDelimiterCount = 0
 
         init(input: String) {
             self.input = input
@@ -41,11 +44,20 @@ class Formatter {
 
     func tokenize(source: String) -> [Token] {
         let state = State(input: source)
-        for character in state.input {
+        let input = state.input
+        for (index, character) in input.enumerated() {
             switch state.mode {
             case .plain:
                 switch character {
                 case "\"":
+                    if index + 2 < input.count {
+                        let startIndex = input.index(input.startIndex, offsetBy: index)
+                        if input[startIndex...input.index(startIndex, offsetBy: 2)] == "\"\"\"" {
+                            state.mode = .multilineString
+                            state.openingDelimiterCount = 1
+                            break
+                        }
+                    }
                     state.mode = .string
                 case "\n":
                     state.tokens.append(Token(type: .newline, value: String(character)))
@@ -88,6 +100,27 @@ class Formatter {
                     state.tokens.append(Token(type: .string, value: state.storage))
                     state.mode = .plain
                     state.storage = ""
+                case "\\":
+                    state.mode = .stringEscape
+                default:
+                    state.storage += String(character)
+                }
+            case .multilineString:
+                switch character {
+                case "\"":
+                    if state.openingDelimiterCount == 3 {
+                        if state.closingDelimiterCount == 2 {
+                            state.tokens.append(Token(type: .string, value: normalizeMultilineLiteral(state.storage)))
+                            state.mode = .plain
+                            state.storage = ""
+                            state.openingDelimiterCount = 0
+                            state.closingDelimiterCount = 0
+                        } else {
+                            state.closingDelimiterCount += 1
+                        }
+                    } else {
+                        state.openingDelimiterCount += 1
+                    }
                 case "\\":
                     state.mode = .stringEscape
                 default:
@@ -153,6 +186,26 @@ class Formatter {
             }
         }
         return state.tokens
+    }
+
+    func normalizeMultilineLiteral(_ literal: String) -> String {
+        var lines = [String]()
+        var isFirstLine = true
+        var indentCount = 0
+        literal.trimmingCharacters(in: .newlines).enumerateLines { (line, stop) in
+            if isFirstLine {
+                for character in line {
+                    if character == " " {
+                        indentCount += 1
+                    } else {
+                        break
+                    }
+                }
+                isFirstLine = false
+            }
+            lines.append(String(line.suffix(line.count - indentCount)))
+        }
+        return lines.dropLast().joined(separator: "\\n")
     }
 
     func format(tokens: [Token]) -> String {

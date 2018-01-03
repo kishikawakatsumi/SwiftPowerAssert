@@ -514,18 +514,25 @@ class Transformer {
     private func stringLiteralExpression(_ child: Expression, _ parent: Expression) -> String {
         var source =  sourceFile[child.range]
         let rest = restOfExpression(child, parent)
-        var previous = ""
-        for character in rest {
-            switch character {
-            case "\"" where previous != "\\":
-                source += String(character)
-                return source
-            default:
-                previous = String(character)
-                source += previous
+        if rest.hasPrefix("\"\"") {
+            // Multiline String Literal
+            if let range = rest.range(of: "\"\"\"") {
+                return source + rest[..<range.upperBound]
+            }
+        } else {
+            var previous = ""
+            for character in rest {
+                switch character {
+                case "\"" where previous != "\\":
+                    source += String(character)
+                    return source
+                default:
+                    previous = String(character)
+                    source += previous
+                }
             }
         }
-        return source
+        return source + rest
     }
 
     func findFirst(_ expression: Expression, where closure: (_ expression: Expression) -> Bool) -> Expression? {
@@ -630,32 +637,39 @@ class Transformer {
         }
 
         var result = source
-        for character in rest {
-            switch mode {
-            case .plain:
-                switch character {
-                case ".", ",", " ", "\"", "\t", "\n", "(", "[", "{", ")", "]", "}", ":", ";", "?":
-                    return result
-                default:
-                    result += String(character)
-                }
-            case .string:
-                switch character {
-                case "\"":
-                    result += String(character)
-                    return result
-                case "\\":
-                    mode = .stringEscape
-                default:
-                    result += String(character)
-                }
-            case .stringEscape:
-                switch character {
-                case "\"", "\\", "'", "t", "n", "r":
-                    mode = .string
-                    result += "\\" + String(character)
-                default:
-                    fatalError("unexpected '\(character)' in string escape")
+        if rest.hasPrefix("\"\"") {
+            // Multiline String Literal
+            if let range = rest.range(of: "\"\"\"") {
+                return source + rest[..<range.upperBound]
+            }
+        } else {
+            for character in rest {
+                switch mode {
+                case .plain:
+                    switch character {
+                    case ".", ",", " ", "\"", "\t", "\n", "(", "[", "{", ")", "]", "}", ":", ";", "?":
+                        return result
+                    default:
+                        result += String(character)
+                    }
+                case .string:
+                    switch character {
+                    case "\"":
+                        result += String(character)
+                        return result
+                    case "\\":
+                        mode = .stringEscape
+                    default:
+                        result += String(character)
+                    }
+                case .stringEscape:
+                    switch character {
+                    case "\"", "\\", "'", "t", "n", "r":
+                        mode = .string
+                        result += "\\" + String(character)
+                    default:
+                        fatalError("unexpected '\(character)' in string escape")
+                    }
                 }
             }
         }
