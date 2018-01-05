@@ -18,21 +18,21 @@
 
 import Foundation
 
-class Parser {
+class ASTParser {
     class State {
-        let root: Node<[Token]>
+        let root: ASTNode<[ASTToken]>
 
-        init(root: Node<[Token]>) {
+        init(root: ASTNode<[ASTToken]>) {
             self.root = root
         }
     }
 
-    func parse(root: Node<[Token]>) -> AST {
+    func parse(root: ASTNode<[ASTToken]>) -> AST {
         let state = State(root: root)
         return parseSourceFileNode(node: state.root)
     }
 
-    private func parseSourceFileNode(node sourceFileNode: Node<[Token]>) -> AST {
+    private func parseSourceFileNode(node sourceFileNode: ASTNode<[ASTToken]>) -> AST {
         var declarations = [Declaration]()
         for node in sourceFileNode.children {
             for token in node.value {
@@ -47,7 +47,7 @@ class Parser {
         return AST(declarations: declarations)
     }
 
-    private func parseClassDeclarationNode(node: Node<[Token]>) -> ClassDeclaration {
+    private func parseClassDeclarationNode(node: ASTNode<[ASTToken]>) -> ClassDeclaration {
         let tokens = node.value
 
         var name: String!
@@ -89,7 +89,7 @@ class Parser {
         return ClassDeclaration(accessLevel: accessLevel, name: name, typeInheritance: typeInheritance, members: members)
     }
 
-    private func parseFunctionDeclarationNode(node: Node<[Token]>) -> FunctionDeclaration {
+    private func parseFunctionDeclarationNode(node: ASTNode<[ASTToken]>) -> FunctionDeclaration {
         let tokens = node.value
 
         var name: String!
@@ -139,7 +139,7 @@ class Parser {
         return FunctionDeclaration(accessLevel: accessLevel, name: name, parameters: parameters, body: body)
     }
 
-    private func parseExpressionNode(node: Node<[Token]>) -> Expression {
+    private func parseExpressionNode(node: ASTNode<[ASTToken]>) -> Expression {
         let tokens = node.value
         let attributes = parseKeyValueAttributes(tokens: tokens)
 
@@ -171,9 +171,10 @@ class Parser {
                 break
             }
         }
+        let implicit = isImplicit(tokens: tokens)
         var expression = Expression(rawValue: rawValue, type: type, rawLocation: rawLocation, rawRange: rawRange,
                                     location: location, range: sourceRange, decl: decl, value: value, throwsModifier: throwsModifier,
-                                    argumentLabels: argumentLabels, expressions: [])
+                                    argumentLabels: argumentLabels, isImplicit: implicit, expressions: [])
 
         for node in node.children {
             let tokens = node.value
@@ -202,11 +203,11 @@ class Parser {
         return SourceRange(start: start, end: end)
     }
 
-    private func parseParameterListNode(node: Node<[Token]>) -> [Parameter] {
+    private func parseParameterListNode(node: ASTNode<[ASTToken]>) -> [Parameter] {
         return node.children.map { parseParameter(tokens: $0.value) }
     }
 
-    private func parseParameter(tokens: [Token]) -> Parameter {
+    private func parseParameter(tokens: [ASTToken]) -> Parameter {
         let attributes = parseKeyValueAttributes(tokens: tokens)
         let externalName: String? = attributes["apiName"]
         var localName: String!
@@ -219,7 +220,7 @@ class Parser {
         return Parameter(externalName: externalName, localName: localName, type: type)
     }
 
-    private func parseKeyValueAttributes(tokens: [Token]) -> [String: String] {
+    private func parseKeyValueAttributes(tokens: [ASTToken]) -> [String: String] {
         var attributes = [String: String]()
         for (index, token) in tokens.enumerated() {
             switch (token.type, token.value) {
@@ -232,7 +233,7 @@ class Parser {
         return attributes
     }
 
-    private func parseInherits(tokens: [Token]) -> String? {
+    private func parseInherits(tokens: [ASTToken]) -> String? {
         for (index, token) in tokens.enumerated() {
             switch (token.type, token.value) {
             case (.token, ":"):
@@ -246,7 +247,7 @@ class Parser {
         return nil
     }
 
-    private func isImplicit(tokens: [Token]) -> Bool {
+    private func isImplicit(tokens: [ASTToken]) -> Bool {
         return tokens.contains {
             if case .token = $0.type, $0.value == "implicit" {
                 return true

@@ -39,6 +39,7 @@ struct Expression {
     let value: String?
     let throwsModifier: String?
     let argumentLabels: String?
+    let isImplicit: Bool
     var expressions = [Expression]()
 }
 
@@ -91,6 +92,8 @@ struct SourceRange {
 }
 
 extension SourceRange: Hashable {
+    static let zero = SourceRange(start: .zero, end: .zero)
+
     var hashValue: Int {
         return 31 &* start.hashValue &+ end.hashValue
     }
@@ -100,9 +103,16 @@ extension SourceRange: Hashable {
     }
 }
 
+extension SourceRange: CustomStringConvertible {
+    var description: String {
+        return "\(start)-\(end)"
+    }
+}
+
 struct SourceLocation {
     let line: Int
     let column: Int
+    static let zero = SourceLocation(line: 0, column: 0)
 }
 
 extension SourceLocation: Hashable {
@@ -112,5 +122,20 @@ extension SourceLocation: Hashable {
 
     static func ==(lhs: SourceLocation, rhs: SourceLocation) -> Bool {
         return lhs.line == rhs.line && lhs.column == rhs.column
+    }
+}
+
+extension SourceLocation: Comparable {
+    static func <(lhs: SourceLocation, rhs: SourceLocation) -> Bool {
+        if lhs.line != rhs.line {
+            return lhs.line < rhs.line
+        }
+        return lhs.column < rhs.column
+    }
+}
+
+extension SourceLocation: CustomStringConvertible {
+    var description: String {
+        return "\(line):\(column)"
     }
 }

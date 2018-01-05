@@ -37,12 +37,12 @@ struct SourceFile {
         } else {
             endIndex = sourceText.index(sourceText.startIndex, offsetBy: end.column)
         }
-        return String(sourceText[startIndex..<endIndex])!
+        return String(String(sourceText)[startIndex..<endIndex])
     }
 }
 
 struct SourceLine {
-    let line: String.UTF8View
+    let text: String.UTF8View
     let lineNumber: Int
     let offset: Int
 }

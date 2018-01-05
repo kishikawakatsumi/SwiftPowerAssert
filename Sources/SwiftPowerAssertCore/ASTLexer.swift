@@ -18,21 +18,21 @@
 
 import Foundation
 
-class Lexer {
+class ASTLexer {
     class State {
-        let tokens: [Token]
+        let tokens: [ASTToken]
 
-        var current = Node<[Token]>([])
-        let root = Node<[Token]>([])
+        var current = ASTNode<[ASTToken]>([])
+        let root = ASTNode<[ASTToken]>([])
 
-        init(tokens: [Token]) {
+        init(tokens: [ASTToken]) {
             self.tokens = tokens
         }
     }
 
-    func lex(tokens: [Token]) -> Node<[Token]> {
+    func lex(tokens: [ASTToken]) -> ASTNode<[ASTToken]> {
         let state = State(tokens: tokens)
-        var stack = [(Int, Node<[Token]>)]()
+        var stack = [(Int, ASTNode<[ASTToken]>)]()
         for token in state.tokens {
             switch token.type {
             case .token, .symbol, .string:
@@ -51,47 +51,18 @@ class Lexer {
                     }
                     stack.append((count, state.current))
 
-                    let current = Node<[Token]>([])
+                    let current = ASTNode<[ASTToken]>([])
                     state.current.append(current)
                     state.current = current
                 } else {
                     stack.append((count, state.current))
 
-                    let current = Node<[Token]>([])
+                    let current = ASTNode<[ASTToken]>([])
                     state.root.append(current)
                     state.current = current
                 }
             }
         }
         return state.root
-    }
-}
-
-class Node<T> {
-    var value: T
-    var children = [Node]()
-    weak var parent: Node?
-
-    init(_ value: T) {
-        self.value = value
-    }
-
-    func append(_ child: Node) {
-        children.append(child)
-        child.parent = self
-    }
-}
-
-extension Node: CustomStringConvertible {
-    var description: String {
-        return recursiveDescription(self, level: 0)
-    }
-
-    private func recursiveDescription(_ node: Node, level: Int) -> String {
-        var description = "\(String(repeating: "  ", count: level))\(node.value)\n"
-        for child in node.children {
-            description += recursiveDescription(child, level: level + 1)
-        }
-        return description
     }
 }
