@@ -80,7 +80,7 @@ public final class SwiftPowerAssert {
         }
     }
 
-    private func tokenize(rawAST: String) -> [Token] {
+    private func tokenize(rawAST: String) -> [ASTToken] {
         var lines = [String]()
         rawAST.enumerateLines { (line, stop) in
             let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -92,17 +92,17 @@ public final class SwiftPowerAssert {
             lines.append(line)
         }
 
-        let tokenizer = Tokenizer()
+        let tokenizer = ASTTokenizer()
         return tokenizer.tokenize(source: lines.joined(separator: "\n"))
     }
 
-    private func lex(tokens: [Token]) -> Node<[Token]> {
-        let lexer = Lexer()
+    private func lex(tokens: [ASTToken]) -> ASTNode<[ASTToken]> {
+        let lexer = ASTLexer()
         return lexer.lex(tokens: tokens)
     }
 
-    private func parse(node: Node<[Token]>) -> AST {
-        let parser = Parser()
+    private func parse(node: ASTNode<[ASTToken]>) -> AST {
+        let parser = ASTParser()
         return parser.parse(root: node)
     }
 

@@ -18,7 +18,7 @@
 
 import XCTest
 
-class XCTestTests: XCTestCase {
+class XCTAssertTests: XCTestCase {
     func testBooleanAssertions() throws {
         let source = """
             import XCTest

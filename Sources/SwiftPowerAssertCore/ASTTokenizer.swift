@@ -18,7 +18,7 @@
 
 import Foundation
 
-class Tokenizer {
+class ASTTokenizer {
     class State {
         enum Mode {
             case plain
@@ -34,7 +34,7 @@ class Tokenizer {
         }
 
         var mode = Mode.plain
-        var tokens = [Token]()
+        var tokens = [ASTToken]()
         var storage = ""
         var input: String
 
@@ -43,7 +43,7 @@ class Tokenizer {
         }
     }
 
-    func tokenize(source: String) -> [Token] {
+    func tokenize(source: String) -> [ASTToken] {
         let state = State(input: source)
         for character in state.input {
             switch state.mode {
@@ -57,7 +57,7 @@ class Tokenizer {
                     state.mode = .newline
                     state.storage = ""
                 case "(", ")", ":":
-                    state.tokens.append(Token(type: .token, value: String(character)))
+                    state.tokens.append(ASTToken(type: .token, value: String(character)))
                 case " ":
                     break
                 default:
@@ -67,24 +67,24 @@ class Tokenizer {
             case .token:
                 switch character {
                 case "'":
-                    state.tokens.append(Token(type: .token, value: state.storage))
+                    state.tokens.append(ASTToken(type: .token, value: state.storage))
                     state.mode = .symbol
                     state.storage = ""
                 case "\"":
-                    state.tokens.append(Token(type: .token, value: state.storage))
+                    state.tokens.append(ASTToken(type: .token, value: state.storage))
                     state.mode = .string
                     state.storage = ""
                 case " ":
-                    state.tokens.append(Token(type: .token, value: state.storage))
+                    state.tokens.append(ASTToken(type: .token, value: state.storage))
                     state.mode = .plain
                     state.storage = ""
                 case "\n":
-                    state.tokens.append(Token(type: .token, value: state.storage))
+                    state.tokens.append(ASTToken(type: .token, value: state.storage))
                     state.mode = .newline
                     state.storage = ""
                 case "=":
-                    state.tokens.append(Token(type: .token, value: state.storage))
-                    state.tokens.append(Token(type: .token, value: String(character)))
+                    state.tokens.append(ASTToken(type: .token, value: state.storage))
+                    state.tokens.append(ASTToken(type: .token, value: String(character)))
                     if state.storage == "location" {
                         state.mode = .path
                     } else {
@@ -92,8 +92,8 @@ class Tokenizer {
                     }
                     state.storage = ""
                 case "(", ")", ":":
-                    state.tokens.append(Token(type: .token, value: state.storage))
-                    state.tokens.append(Token(type: .token, value: String(character)))
+                    state.tokens.append(ASTToken(type: .token, value: state.storage))
+                    state.tokens.append(ASTToken(type: .token, value: String(character)))
                     state.mode = .plain
                     state.storage = ""
                 default:
@@ -104,7 +104,7 @@ class Tokenizer {
                 case "[":
                     state.mode = .array
                 case " ":
-                    state.tokens.append(Token(type: .token, value: state.storage))
+                    state.tokens.append(ASTToken(type: .token, value: state.storage))
                     state.mode = .plain
                     state.storage = ""
                 case "'":
@@ -112,7 +112,7 @@ class Tokenizer {
                 case "\"":
                     state.mode = .string
                 case "\n":
-                    state.tokens.append(Token(type: .token, value: state.storage))
+                    state.tokens.append(ASTToken(type: .token, value: state.storage))
                     state.mode = .newline
                     state.storage = ""
                 default:
@@ -124,7 +124,7 @@ class Tokenizer {
                     state.mode = .array
                 case " ":
                     if state.storage.contains(":") {
-                        state.tokens.append(Token(type: .token, value: state.storage))
+                        state.tokens.append(ASTToken(type: .token, value: state.storage))
                         state.mode = .plain
                         state.storage = ""
                     } else {
@@ -135,7 +135,7 @@ class Tokenizer {
                 case "\"":
                     state.mode = .string
                 case "\n":
-                    state.tokens.append(Token(type: .token, value: state.storage))
+                    state.tokens.append(ASTToken(type: .token, value: state.storage))
                     state.mode = .newline
                     state.storage = ""
                 default:
@@ -144,7 +144,7 @@ class Tokenizer {
             case .array:
                 switch character {
                 case "]":
-                    state.tokens.append(Token(type: .token, value: state.storage))
+                    state.tokens.append(ASTToken(type: .token, value: state.storage))
                     state.mode = .plain
                     state.storage = ""
                 default:
@@ -153,7 +153,7 @@ class Tokenizer {
             case .symbol:
                 switch character {
                 case "'":
-                    state.tokens.append(Token(type: .symbol, value: state.storage))
+                    state.tokens.append(ASTToken(type: .symbol, value: state.storage))
                     state.mode = .plain
                     state.storage = ""
                 default:
@@ -162,7 +162,7 @@ class Tokenizer {
             case .string:
                 switch character {
                 case "\"":
-                    state.tokens.append(Token(type: .string, value: state.storage))
+                    state.tokens.append(ASTToken(type: .string, value: state.storage))
                     state.mode = .plain
                     state.storage = ""
                 case "\\":
@@ -184,7 +184,7 @@ class Tokenizer {
                     state.mode = .indent
                     state.storage = String(character)
                 case "(", ")", ":":
-                    state.tokens.append(Token(type: .token, value: String(character)))
+                    state.tokens.append(ASTToken(type: .token, value: String(character)))
                     state.mode = .plain
                 case "\n":
                     break
@@ -200,48 +200,16 @@ class Tokenizer {
                     state.mode = .newline
                     state.storage = ""
                 case "(", ")", ":":
-                    state.tokens.append(Token(type: .indent(state.storage.count), value: state.storage))
-                    state.tokens.append(Token(type: .token, value: String(character)))
+                    state.tokens.append(ASTToken(type: .indent(state.storage.count), value: state.storage))
+                    state.tokens.append(ASTToken(type: .token, value: String(character)))
                     state.mode = .plain
                 default:
-                    state.tokens.append(Token(type: .indent(state.storage.count), value: state.storage))
+                    state.tokens.append(ASTToken(type: .indent(state.storage.count), value: state.storage))
                     state.mode = .token
                     state.storage = String(character)
                 }
             }
         }
         return state.tokens
-    }
-}
-
-class Token {
-    enum TokenType {
-        case token
-        case symbol
-        case string
-        case indent(Int)
-    }
-
-    var type: TokenType
-    var value: String
-
-    init(type: TokenType, value: String) {
-        self.type = type
-        self.value = value
-    }
-}
-
-extension Token: CustomStringConvertible {
-    var description: String {
-        switch type {
-        case .indent(let count):
-            return String(repeating: "_", count: count)
-        case .token:
-            return "\(value)"
-        case .symbol:
-            return "'\(value)'"
-        case .string:
-            return "\"\(value)\""
-        }
     }
 }

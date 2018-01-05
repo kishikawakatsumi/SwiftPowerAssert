@@ -62,7 +62,7 @@ struct XCTestTool {
 
         let xcodebuild = Xcodebuild()
         print("Reading project settings...")
-        let rawBuildSettings = try xcodebuild.showBuildSettings(arguments: xcarguments + ["ONLY_ACTIVE_ARCH=NO"])
+        let rawBuildSettings = try xcodebuild.showBuildSettings(arguments: xcarguments)
         let buildSettings = BuildSettings.parse(rawBuildSettings)
         guard let targetBuildSettings = buildSettings.values.filter({ $0.settings["PRODUCT_TYPE"] == "com.apple.product-type.bundle.unit-test" }).first else {
             throw SwiftPowerAssertError.noUnitTestBundle
@@ -72,7 +72,7 @@ struct XCTestTool {
         let indicesToBeRemoved = buildActions.map { $0.0 } + testOnlyOptions.map{ $0.0 }
         let buildOptions = xcarguments.enumerated().filter { !indicesToBeRemoved.contains($0.offset) }.map { $0.element }
 
-        var additionalOptions = ["ONLY_ACTIVE_ARCH=NO"]
+        var additionalOptions = [String]()
         if !configurationOptionExists {
             additionalOptions.append("-configuration")
             additionalOptions.append(targetBuildSettings.settings["CONFIGURATION"]!)

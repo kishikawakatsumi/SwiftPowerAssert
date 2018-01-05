@@ -1485,7 +1485,6 @@ class AssertTests: XCTestCase {
                     )
                 }
             }
-
             """
 
         let expected = """
@@ -1577,7 +1576,6 @@ class AssertTests: XCTestCase {
                         "Lorem ipsum dolor sit amet,\\nconsectetur adipiscing elit,")
                 }
             }
-
             """
 
         let expected = """
@@ -1640,7 +1638,6 @@ class AssertTests: XCTestCase {
                     assert(sparklingHeart != "\\u{1F496}")
                 }
             }
-
             """
 
         let expected = """
@@ -1761,7 +1758,6 @@ class AssertTests: XCTestCase {
                         \""")
                 }
             }
-
             """
 
         let expected = """
@@ -1780,6 +1776,150 @@ class AssertTests: XCTestCase {
                    |                         |  "Escaping the first quotation mark \\"\\"\\"\\nEscaping all three quotation marks \\"\\"\\""
                    |                         false
                    "Escaping the first quotation mark \\"\\"\\"\\nEscaping all three quotation marks \\"\\"\\""
+
+            """
+
+        let result = TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
+    func testCustomOperator() throws {
+        let source = """
+            import XCTest
+
+            infix operator ×: MultiplicationPrecedence
+            func ×(left: Double, right: Double) -> Double {
+                return left * right
+            }
+
+            prefix operator √
+            prefix func √(number: Double) -> Double {
+                return sqrt(number)
+            }
+
+            prefix operator √√
+            prefix func √√(number: Double) -> Double {
+                return sqrt(sqrt(number))
+            }
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let number1 = 100.0
+                    let number2 = 200.0
+                    assert(number1 × number2 == 200.0)
+                    assert(√number2 == 200.0)
+                    assert(√√number2 == 200.0)
+                    assert(200.0 == √√number2)
+                    assert(√number2 == √√number2)
+                }
+            }
+            """
+
+        let expected = """
+            assert(number1 × number2 == 200.0)
+                   |       | |       |  |
+                   100.0   | 200.0   |  200
+                           20000.0   false
+            assert(√number2 == 200.0)
+                   ||       |  |
+                   |200.0   |  200
+                   |        false
+                   14.142135623731
+            assert(√√number2 == 200.0)
+                   | |       |  |
+                   | 200.0   |  200
+                   |         false
+                   3.76060309308639
+            assert(200.0 == √√number2)
+                   |     |  | |
+                   200   |  | 200.0
+                         |  3.76060309308639
+                         false
+            assert(√number2 == √√number2)
+                   ||       |  | |
+                   |200.0   |  | 200.0
+                   |        |  3.76060309308639
+                   |        false
+                   14.142135623731
+
+            """
+
+        let result = TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
+    func testNoWhitespaces() throws {
+        let source = """
+            import XCTest
+
+            infix operator ×: MultiplicationPrecedence
+            func ×(left: Double, right: Double) -> Double {
+                return left * right
+            }
+
+            prefix operator √
+            prefix func √(number: Double) -> Double {
+                return sqrt(number)
+            }
+
+            prefix operator √√
+            prefix func √√(number: Double) -> Double {
+                return sqrt(sqrt(number))
+            }
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let b1=false
+                    let i1=0
+                    let i2=1
+                    let d1=4.0
+                    let d2=6.0
+                    assert(i2==4)
+                    assert(b1==true&&i1>i2||true==b1&&i2==4)
+                    assert(b1==true&&i1>i2||true==b1&&i2==4||d1×d2==1)
+                }
+            }
+            """
+
+        let expected = """
+            assert(i2==4)
+                   | | |
+                   1 | 4
+                     false
+            assert(b1==true&&i1>i2||true==b1&&i2==4)
+                   | | |   | | || | |   | | | | | |
+                   | | |   | 0 |1 | |   | | | 1 | 4
+                   | | |   |   |  | |   | | |   false
+                   | | |   |   |  | |   | | false
+                   | | |   |   |  | |   | false
+                   | | |   |   |  | |   false
+                   | | |   |   |  | true
+                   | | |   |   |  false
+                   | | |   |   false
+                   | | |   false
+                   | | true
+                   | false
+                   false
+            assert(b1==true&&i1>i2||true==b1&&i2==4||d1×d2==1)
+                   | | |   | | || | |   | | | | | || | || | |
+                   | | |   | 0 |1 | |   | | | 1 | || | || | 1
+                   | | |   |   |  | |   | | |   | || | || false
+                   | | |   |   |  | |   | | |   | || | |6.0
+                   | | |   |   |  | |   | | |   | || | 24.0
+                   | | |   |   |  | |   | | |   | || 4.0
+                   | | |   |   |  | |   | | |   | |false
+                   | | |   |   |  | |   | | |   | 4
+                   | | |   |   |  | |   | | |   false
+                   | | |   |   |  | |   | | false
+                   | | |   |   |  | |   | false
+                   | | |   |   |  | |   false
+                   | | |   |   |  | true
+                   | | |   |   |  false
+                   | | |   |   false
+                   | | |   false
+                   | | true
+                   | false
+                   false
 
             """
 

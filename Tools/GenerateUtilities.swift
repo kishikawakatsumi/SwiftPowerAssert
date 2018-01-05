@@ -44,7 +44,7 @@ var generatedCode = """
     import Foundation
 
     public class __DisplayWidth {
-        public static func of(_ s: String, inEastAsian: Bool = false) -> Int {
+        public static func of(_ s: String, inEastAsian: Bool = true) -> Int {
             return s.unicodeScalars.reduce(0) { $0 + of($1, inEastAsian: inEastAsian) }
         }
 

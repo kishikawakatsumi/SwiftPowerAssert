@@ -28,7 +28,7 @@ class Transformer {
         var offset = 0
         var sourceLines = [SourceLine]()
         source.enumerateLines { (line, stop) in
-            sourceLines.append(SourceLine(line: line.utf8, lineNumber: lineNumber, offset: offset))
+            sourceLines.append(SourceLine(text: line.utf8, lineNumber: lineNumber, offset: offset))
             lineNumber += 1
             offset += line.utf8.count + 1 // characters + newline
         }
@@ -164,89 +164,83 @@ class Transformer {
 
     private func recordValues(_ expression: Expression, _ numberOfParameters: Int) -> [Int: String] {
         var values = [Int: String]()
-        let formatter = Formatter()
+        let formatter = SourceFormatter()
 
-        let parenExpression = findFirst(expression) { $0.rawValue == "tuple_shuffle_expr" } ?? findFirst(expression) { $0.rawValue == "paren_expr" }
-        let sentinelExpression = findSentinelExpression(expression: parenExpression!, numberOfParameters)
+        let analyzer = SourceCompletion(expression: expression, numberOfParameters: numberOfParameters, sourceFile: sourceFile)
 
-        traverse(expression) { (childExpression, skip) in
-            if childExpression == sentinelExpression {
-                skip = true
+        traverse(expression) { (childExpression, stop) in
+            if childExpression == analyzer.sentinelExpression {
+                stop = true
                 return
             }
-            guard let wholeRange = expression.range, let valueRange = childExpression.range, wholeRange != valueRange else {
+            guard let wholeRange = expression.range, let partRange = childExpression.range, wholeRange != partRange else {
                 return
             }
             
             let wholeExpressionSource = sourceFile[wholeRange]
-            let valueExpressionSource = sourceFile[valueRange]
+            let partExpressionSource = sourceFile[partRange]
+
 
             if (childExpression.rawValue == "declref_expr" && !childExpression.type.contains("->")) ||
                 childExpression.rawValue == "magic_identifier_literal_expr" {
-                let source = completeExpressionSource(childExpression, expression)
+                let source = analyzer.completeSource(expression: childExpression)
                 if source.hasPrefix("$") {
                     return
                 }
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
-
-                let column = columnInFunctionCall(column: valueRange.end.column, startLine: valueRange.start.line, endLine: valueRange.end.line, tokens: tokens, child: childExpression, parent: expression)
+                let column = columnInFunctionCall(start: wholeRange.start, target: partRange.end, tokens: tokens)
                 switch source {
                 case "#column":
                     values[column] = "\(childExpression.location.column)"
                 case "#line":
                     values[column] = "\(childExpression.location.line + 1)"
                 default:
-                    values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+                    values[column] = formatter.format(source: source)
                 }
             }
             if (childExpression.rawValue == "member_ref_expr" && !childExpression.type.contains("->")) || childExpression.rawValue == "dot_self_expr" {
-                let source = completeExpressionSource(childExpression, expression)
+                let source = analyzer.completeSource(expression: childExpression)
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
-
-                let column = columnInFunctionCall(column: valueRange.end.column, startLine: valueRange.start.line, endLine: valueRange.end.line, tokens: tokens, child: childExpression, parent: expression)
-
+                let column = columnInFunctionCall(start: wholeRange.start, target: partRange.end, tokens: tokens)
                 if source.hasPrefix(".") {
-                    values[column] = childExpression.type.replacingOccurrences(of: "@lvalue ", with: "") + formatter.format(tokens: formatter.tokenize(source: source))
+                    values[column] = childExpression.type.replacingOccurrences(of: "@lvalue ", with: "") + formatter.format(source: source)
                 } else {
-                    values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+                    values[column] = formatter.format(source: source)
                 }
             }
-            if childExpression.rawValue == "tuple_element_expr" || childExpression.rawValue == "keypath_expr" {
-                let source = completeExpressionSource(childExpression, expression)
+            if childExpression.rawValue == "tuple_element_expr" ||
+                childExpression.rawValue == "keypath_expr" {
+                let source = analyzer.completeSource(expression: childExpression)
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
-
-                let column = columnInFunctionCall(column: valueRange.end.column, startLine: valueRange.start.line, endLine: valueRange.end.line, tokens: tokens, child: childExpression, parent: expression)
-                values[column] = formatter.format(tokens: formatter.tokenize(source: source)) + " as \(childExpression.type!)"
+                let column = columnInFunctionCall(start: wholeRange.start, target: partRange.end, tokens: tokens)
+                values[column] = formatter.format(source: source) + " as \(childExpression.type!)"
             }
             if childExpression.rawValue == "string_literal_expr" {
                 let source = stringLiteralExpression(childExpression, expression)
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
-
-                let column = columnInFunctionCall(column: valueRange.end.column, startLine: valueRange.start.line, endLine: valueRange.end.line, tokens: tokens, child: childExpression, parent: expression)
-                values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+                let column = columnInFunctionCall(start: wholeRange.start, target: partRange.end, tokens: tokens)
+                values[column] = formatter.format(source: source)
             }
-            if childExpression.rawValue == "array_expr" || childExpression.rawValue == "dictionary_expr" ||
+            if childExpression.rawValue == "array_expr" ||
+                childExpression.rawValue == "dictionary_expr" ||
                 childExpression.rawValue == "object_literal" {
-                let source = valueExpressionSource
+                let source = partExpressionSource
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
-
-                let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
-                values[column] = formatter.format(tokens: formatter.tokenize(source: source)) + " as \(childExpression.type!)"
+                let column = columnInFunctionCall(start: wholeRange.start, target: childExpression.location, tokens: tokens)
+                values[column] = formatter.format(source: source) + " as \(childExpression.type!)"
             }
-            if childExpression.rawValue == "subscript_expr" || childExpression.rawValue == "keypath_application_expr" ||
+            if childExpression.rawValue == "subscript_expr" ||
+                childExpression.rawValue == "keypath_application_expr" ||
                 childExpression.rawValue == "objc_selector_expr" {
-                let source = valueExpressionSource
+                let source = partExpressionSource
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
-
-                let column = columnInFunctionCall(column: valueRange.end.column, startLine: valueRange.start.line, endLine: valueRange.end.line, tokens: tokens, child: childExpression, parent: expression)
-                values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+                let column = columnInFunctionCall(start: wholeRange.start, target: partRange.end, tokens: tokens)
+                values[column] = formatter.format(source: source)
             }
             if childExpression.rawValue == "call_expr" {
-                let source = completeExpressionSource(childExpression, expression)
+                let source = analyzer.completeSource(expression: childExpression)
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
-
-                let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
-
+                let column = columnInFunctionCall(start: wholeRange.start, target: childExpression.location, tokens: tokens)
                 let formatted = formatter.format(tokens: formatter.tokenize(source: source), withHint: childExpression)
                 if !childExpression.expressions.isEmpty && childExpression.throwsModifier == "throws" {
                     values[column] = "try! " + formatted
@@ -256,28 +250,25 @@ class Transformer {
                     values[column] = formatted
                 }
             }
-            if childExpression.rawValue == "binary_expr" {
-                let source = completeExpressionSource(childExpression, expression)
+            if childExpression.rawValue == "binary_expr" || childExpression.rawValue == "prefix_unary_expr" {
+                let source = analyzer.completeSource(expression: childExpression)
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
-
                 var containsThrowsFunction = false
-                traverse(childExpression) { (expression, skip) in
+                traverse(childExpression) { (expression, _) in
                     guard !containsThrowsFunction else { return }
                     containsThrowsFunction = expression.rawValue == "call_expr" && expression.throwsModifier == "throws"
                 }
-
-                let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
-                values[column] = (containsThrowsFunction ? "try! " : "") + formatter.format(tokens: formatter.tokenize(source: source))
+                let column = columnInFunctionCall(start: wholeRange.start, target: childExpression.location, tokens: tokens)
+                values[column] = (containsThrowsFunction ? "try! " : "") + formatter.format(source: source)
             }
             if childExpression.rawValue == "if_expr" {
-                let source = completeExpressionSource(childExpression, expression)
+                let source = analyzer.completeSource(expression: childExpression)
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
-
-                let column = columnInFunctionCall(column: childExpression.location.column, startLine: childExpression.location.line, endLine: childExpression.location.line, tokens: tokens, child: childExpression, parent: expression)
-                values[column] = formatter.format(tokens: formatter.tokenize(source: source))
+                let column = columnInFunctionCall(start: wholeRange.start, target: childExpression.location, tokens: tokens)
+                values[column] = formatter.format(source: source)
             }
             if childExpression.rawValue == "closure_expr" {
-                skip = true
+                stop = true
                 return
             }
         }
@@ -297,7 +288,7 @@ class Transformer {
         let expressionSource = sourceFile[expression.range]
         let tupleExpression = expression.expressions[1]
         let tupleExpressionSource = sourceFile[tupleExpression.range]
-        let formatter = Formatter()
+        let formatter = SourceFormatter()
         let recordValues = recordValuesCodeFragment(values: values)
         let condition = "__Util.equal(\(formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource), withHint: tupleExpression)))"
         let assertion = formatter.escaped(tokens: formatter.tokenize(source: expressionSource), withHint: tupleExpression)
@@ -307,7 +298,7 @@ class Transformer {
     private func instrument(equality expression: Expression, tupleExpression: Expression, values: [Int: String], failureCondition: Bool = false) -> String {
         let expressionSource = sourceFile[expression.range]
         let tupleExpressionSource = sourceFile[tupleExpression.range]
-        let formatter = Formatter()
+        let formatter = SourceFormatter()
         let recordValues = recordValuesCodeFragment(values: values)
         let condition = "__Util.equal(\(formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource), withHint: tupleExpression)))"
         let assertion = formatter.escaped(tokens: formatter.tokenize(source: expressionSource), withHint: tupleExpression)
@@ -318,7 +309,7 @@ class Transformer {
         let expressionSource = sourceFile[expression.range]
         let tupleExpression = expression.expressions[1]
         let tupleExpressionSource = sourceFile[tupleExpression.range]
-        let formatter = Formatter()
+        let formatter = SourceFormatter()
         let recordValues = recordValuesCodeFragment(values: values)
         let condition = "__Util.greaterThan(\(formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource), withHint: tupleExpression)))"
         let assertion = formatter.escaped(tokens: formatter.tokenize(source: expressionSource), withHint: tupleExpression)
@@ -329,7 +320,7 @@ class Transformer {
         let expressionSource = sourceFile[expression.range]
         let tupleExpression = expression.expressions[1]
         let tupleExpressionSource = sourceFile[tupleExpression.range]
-        let formatter = Formatter()
+        let formatter = SourceFormatter()
         let recordValues = recordValuesCodeFragment(values: values)
         let condition = "__Util.greaterThanOrEqual(\(formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource), withHint: tupleExpression)))"
         let assertion = formatter.escaped(tokens: formatter.tokenize(source: expressionSource), withHint: tupleExpression)
@@ -473,7 +464,7 @@ class Transformer {
                         current += 1
                     }
                     message += string
-                    current += __DisplayWidth.of(string, inEastAsian: true)
+                    current += __DisplayWidth.of(string)
                 }
                 message += "\(assertion)\\n"
                 var values = Array(valueColumns).sorted { $0.0 < $1.0 }
@@ -530,53 +521,6 @@ class Transformer {
         return source + rest
     }
 
-    func findFirst(_ expression: Expression, where closure: (_ expression: Expression) -> Bool) -> Expression? {
-        if closure(expression) {
-            return expression
-        }
-        for expression in expression.expressions {
-            if let found = findFirst(expression, where: closure) {
-                return found
-            }
-        }
-        return nil
-    }
-
-    private func traverse(_ expression: Expression, closure: (_ expression: Expression, _ skipChildren: inout Bool) -> ()) {
-        var skip = false
-        closure(expression, &skip)
-        if skip {
-            return
-        }
-        for expression in expression.expressions {
-            traverse(expression, closure: closure)
-        }
-    }
-
-    private func findSentinelExpression(expression: Expression, _ numberOfParameters: Int) -> Expression? {
-        var sentinel: Expression?
-        var sentinelParent: Expression?
-        var current: Expression?
-        traverse(expression) { (childExpression, skip) in
-            if childExpression.rawValue == "autoclosure_expr" {
-                sentinelParent = current
-                skip = true
-                return
-            }
-            current = childExpression
-        }
-        if let sentinelParent = sentinelParent, numberOfParameters < sentinelParent.expressions.count {
-            sentinel = sentinelParent.expressions[numberOfParameters]
-        }
-        return sentinel
-    }
-
-    private func completeExpressionSource(_ child: Expression, _ parent: Expression) -> String {
-        let source = sourceFile[child.range]
-        let rest = restOfExpression(child, parent)
-        return extendExpression(rest, source)
-    }
-
     private func restOfExpression(_ child: Expression, _ parent: Expression) -> String {
         let sourceText = sourceFile.sourceText
         let startIndex: String.Index
@@ -595,149 +539,162 @@ class Transformer {
         return String(sourceText[startIndex..<endIndex])!
     }
 
-    private func extendExpression(_ rest: String, _ source: String) -> String {
-        enum Mode {
-            case plain
-            case string
-            case stringEscape
-            case unicodeEscape
-        }
-        var mode = Mode.plain
-
-        for character in source {
-            switch mode {
-            case .plain:
-                switch character {
-                case "\"":
-                    mode = .string
-                default:
-                    break
-                }
-            case .string:
-                switch character {
-                case "\"":
-                    mode = .plain
-                case "\\":
-                    mode = .stringEscape
-                default:
-                    break
-                }
-            case .stringEscape:
-                switch character {
-                case "\"", "\\", "'", "t", "n", "r", "0":
-                    mode = .string
-                case "u":
-                    mode = .unicodeEscape
-                default:
-                    fatalError("unexpected '\(character)' in string escape")
-                }
-            case .unicodeEscape:
-                switch character {
-                case "}":
-                    mode = .string
-                    break
-                default:
-                    break
-                }
-            }
-        }
-
-        var result = source
-        if rest.hasPrefix("\"\"") {
-            // Multiline String Literal
-            let normalized = rest.replacingOccurrences(of: "\\\"\"\"", with: "\\\"\\\"\\\"")
-            if let range = normalized.range(of: "\"\"\"") {
-                return source + normalized[..<range.upperBound]
-            }
+    private func columnInFunctionCall(start: SourceLocation, target: SourceLocation, tokens: [Token]) -> Int {
+        let location: SourceLocation
+        if target.line == start.line {
+            location = SourceLocation(line: target.line - start.line, column: target.column - start.column)
         } else {
-            for character in rest {
-                switch mode {
-                case .plain:
-                    switch character {
-                    case ".", ",", " ", "\"", "\t", "\n", "(", "[", "{", ")", "]", "}", ":", ";", "?":
-                        return result
-                    default:
-                        result += String(character)
+            location = SourceLocation(line: target.line - start.line, column: target.column)
+        }
+
+        var source = ""
+        var column = 0
+        for token in tokens {
+            if location.line == token.location.line {
+                if case .indent = token.type {
+                    continue
+                }
+                column = token.location.column
+                for character in token.formattedValue {
+                    let s = String(character)
+                    source += s
+                    column += s.utf8.count
+                    if column >= location.column {
+                        return __DisplayWidth.of(source)
                     }
-                case .string:
-                    switch character {
-                    case "\"":
-                        result += String(character)
-                        return result
-                    case "\\":
-                        mode = .stringEscape
-                    default:
-                        result += String(character)
-                    }
-                case .stringEscape:
-                    switch character {
-                    case "\"", "\\", "'", "t", "n", "r", "0":
-                        mode = .string
-                        result += "\\" + String(character)
-                    case "u":
-                        mode = .unicodeEscape
-                        result += "\\" + String(character)
-                    default:
-                        fatalError("unexpected '\(character)' in string escape")
-                    }
-                case .unicodeEscape:
-                    switch character {
-                    case "}":
-                        mode = .string
-                        result += String(character)
-                    default:
-                        result += String(character)
-                    }
+                }
+            } else {
+                if case .indent = token.type {
+                    continue
+                } else {
+                    source += token.formattedValue
                 }
             }
         }
-        return result
+        return __DisplayWidth.of(source)
     }
+}
 
-    private func columnInFunctionCall(column: Int, startLine: Int, endLine: Int, tokens: [Formatter.Token], child: Expression, parent: Expression) -> Int {
-        var columnIndex = 0
-        let endLineIndex = endLine - parent.range.start.line
+func traverse(_ expression: Expression, closure: (_ expression: Expression, _ stop: inout Bool) -> ()) {
+    var stop = false
+    closure(expression, &stop)
+    if stop {
+        return
+    }
+    for expression in expression.expressions {
+        traverse(expression, closure: closure)
+    }
+}
 
-        var lineIndex = 0
-
-        var indent = 0
-        if parent.range.start.line == endLine {
-            indent = parent.range.start.column
+func findFirst(_ expression: Expression, where closure: (_ expression: Expression) -> Bool) -> Expression? {
+    if closure(expression) {
+        return expression
+    }
+    for expression in expression.expressions {
+        if let found = findFirst(expression, where: closure) {
+            return found
         }
+    }
+    return nil
+}
 
-        loop: for token in tokens {
+class SourceCompletion {
+    let sourceFile: SourceFile
+    let expression: Expression
+    let numberOfParameters: Int
+
+    let parenExpression: Expression
+    let sentinelExpression: Expression?
+    let boundaries: [SourceLocation]
+
+    init(expression: Expression, numberOfParameters: Int, sourceFile: SourceFile) {
+        self.expression = expression
+        self.numberOfParameters = numberOfParameters
+        self.sourceFile = sourceFile
+
+        parenExpression = findFirst(expression) { $0.rawValue == "tuple_shuffle_expr" } ?? findFirst(expression) { $0.rawValue == "paren_expr" }!
+        sentinelExpression = SourceCompletion.findSentinelExpression(expression: parenExpression, numberOfParameters)
+
+        var boundaries = OrderedSet<SourceLocation>()
+        traverse(expression) { (expression, stop) in
+            if expression.rawValue == "declref_expr" {
+                boundaries.append(expression.range.start)
+            }
+            if expression.rawValue == "call_expr" && !expression.isImplicit {
+                boundaries.append(expression.range.start)
+                boundaries.append(expression.range.end)
+            }
+            if expression.rawValue == "member_ref_expr" {
+                boundaries.append(SourceLocation(line: expression.range.end.line, column: expression.range.end.column - 2 /* foo.b -> foo */))
+            }
+            if expression.rawValue == "string_literal_expr" {
+                boundaries.append(expression.range.start)
+            }
+            if expression.rawValue == "paren_expr" {
+                boundaries.append(SourceLocation(line: expression.range.end.line, column: expression.range.end.column - 1 /* ...foo) -> foo */))
+            }
+        }
+        let source = sourceFile[parenExpression.range]
+
+        let formatter = SourceFormatter()
+        let tokens = formatter.tokenize(source: source)
+        let line = parenExpression.range.start.line
+        let column = parenExpression.range.start.column
+
+        for token in tokens {
+            let offset = token.location.line == 0 ? column : 0
             switch token.type {
             case .token:
-                if lineIndex < endLineIndex {
-                    columnIndex += token.value.utf8.count
-                } else if lineIndex == endLineIndex {
-                    columnIndex += column
-                    break loop
+                switch token.value {
+                case ".", ",", " ", "\"", "\t", "\n", "(", "[", "{", ")", "]", "}", ":", ";", "?":
+                    boundaries.append(SourceLocation(line: token.location.line + line, column: token.location.column + offset))
+                default:
+                    break
                 }
             case .string:
-                if lineIndex < endLineIndex {
-                    columnIndex += ("\"" + token.value + "\"").utf8.count
-                } else if lineIndex == endLineIndex {
-                    columnIndex += column
-                    break loop
-                }
-            case .indent(let count):
-                if lineIndex == endLineIndex {
-                    indent += count
-                    columnIndex += column
-                    break loop
-                }
+                boundaries.append(SourceLocation(line: token.location.line + line, column: token.location.column + offset))
+            case .multilineString:
+                boundaries.append(SourceLocation(line: token.location.line + line, column: token.location.column + offset))
             case .newline:
-                columnIndex += 1
-                lineIndex += 1
+                boundaries.append(SourceLocation(line: token.location.line + line, column: token.location.column + offset))
+            case .indent(_):
+                boundaries.append(SourceLocation(line: token.location.line + line, column: token.location.column + offset))
+            case .whitespaces:
+                boundaries.append(SourceLocation(line: token.location.line + line, column: token.location.column + offset))
             }
         }
 
-        let formatter = Formatter()
-        let whole = formatter.format(tokens: formatter.tokenize(source: sourceFile[parent.range])).utf8
-        let prefix = whole.prefix(upTo: whole.index(whole.startIndex, offsetBy: columnIndex - indent))
-        
-        return __DisplayWidth.of(String(prefix)!, inEastAsian: true)
+        self.boundaries = boundaries.sorted()
+    }
+
+    func completeSource(expression: Expression) -> String {
+        var nextBoundary = parenExpression.range.end
+        for boundary in boundaries {
+            if expression.range.end <= boundary {
+                nextBoundary = boundary
+                break
+            }
+        }
+        let range = SourceRange(start: expression.range.start, end: SourceLocation(line: nextBoundary.line, column: nextBoundary.column))
+        return sourceFile[range]
+    }
+
+    private static func findSentinelExpression(expression: Expression, _ numberOfParameters: Int) -> Expression? {
+        var sentinel: Expression?
+        var sentinelParent: Expression?
+        var current: Expression?
+        traverse(expression) { (childExpression, stop) in
+            if childExpression.rawValue == "autoclosure_expr" {
+                sentinelParent = current
+                stop = true
+                return
+            }
+            current = childExpression
+        }
+        if let sentinelParent = sentinelParent, numberOfParameters < sentinelParent.expressions.count {
+            sentinel = sentinelParent.expressions[numberOfParameters]
+        }
+        return sentinel
     }
 }
 
