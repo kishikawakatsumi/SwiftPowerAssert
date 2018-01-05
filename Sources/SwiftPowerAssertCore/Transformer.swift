@@ -275,7 +275,7 @@ class Transformer {
         return values
     }
 
-    func recordValuesCodeFragment(values: [Int: String]) -> String {
+    private func recordValuesCodeFragment(values: [Int: String]) -> String {
         var code = ""
         for (key, value) in values {
             code += "valueColumns[\(key)] = __Util.toString(\(value))\n"

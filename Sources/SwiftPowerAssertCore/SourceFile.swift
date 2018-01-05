@@ -22,21 +22,6 @@ struct SourceFile {
     let sourceText: String.UTF8View
     let sourceLines: [SourceLine]
 
-    func canonicalLocation(_ location: SourceLocation) -> SourceLocation {
-        let sourceLine = sourceLines[location.line]
-        let text = sourceLine.text
-        var offset = location.column
-        var index = text.index(text.startIndex, offsetBy: offset)
-        while index < text.endIndex {
-            if let s = String(text[..<index]) {
-                return SourceLocation(line: location.line, column: s.count)
-            }
-            offset += 1
-            index = text.index(text.startIndex, offsetBy: offset)
-        }
-        return location
-    }
-
     subscript(range: SourceRange) -> String {
         let start = range.start
         let end = range.end
