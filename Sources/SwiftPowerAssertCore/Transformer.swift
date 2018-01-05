@@ -165,11 +165,10 @@ class Transformer {
     private func recordValues(_ expression: Expression, _ numberOfParameters: Int) -> [Int: String] {
         var values = [Int: String]()
         let formatter = SourceFormatter()
-
-        let analyzer = SourceCompletion(expression: expression, numberOfParameters: numberOfParameters, sourceFile: sourceFile)
+        let completion = SourceCompletion(expression: expression, numberOfParameters: numberOfParameters, sourceFile: sourceFile)
 
         traverse(expression) { (childExpression, stop) in
-            if childExpression == analyzer.sentinelExpression {
+            if childExpression == completion.sentinelExpression {
                 stop = true
                 return
             }
@@ -180,13 +179,17 @@ class Transformer {
             let wholeExpressionSource = sourceFile[wholeRange]
             let partExpressionSource = sourceFile[partRange]
 
-
-            if (childExpression.rawValue == "declref_expr" && !childExpression.type.contains("->")) ||
-                childExpression.rawValue == "magic_identifier_literal_expr" {
-                let source = analyzer.completeSource(expression: childExpression)
+            switch childExpression.rawValue {
+            case "declref_expr" where !childExpression.type.contains("->"):
+                let source = completion.completeSource(expression: childExpression)
                 if source.hasPrefix("$") {
                     return
                 }
+                let tokens = formatter.tokenize(source: wholeExpressionSource)
+                let column = columnInFunctionCall(start: wholeRange.start, target: partRange.end, tokens: tokens)
+                values[column] = formatter.format(source: source)
+            case "magic_identifier_literal_expr":
+                let source = completion.completeSource(expression: childExpression)
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
                 let column = columnInFunctionCall(start: wholeRange.start, target: partRange.end, tokens: tokens)
                 switch source {
@@ -197,9 +200,8 @@ class Transformer {
                 default:
                     values[column] = formatter.format(source: source)
                 }
-            }
-            if (childExpression.rawValue == "member_ref_expr" && !childExpression.type.contains("->")) || childExpression.rawValue == "dot_self_expr" {
-                let source = analyzer.completeSource(expression: childExpression)
+            case "member_ref_expr" where !childExpression.type.contains("->"):
+                let source = completion.completeSource(expression: childExpression)
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
                 let column = columnInFunctionCall(start: wholeRange.start, target: partRange.end, tokens: tokens)
                 if source.hasPrefix(".") {
@@ -207,38 +209,37 @@ class Transformer {
                 } else {
                     values[column] = formatter.format(source: source)
                 }
-            }
-            if childExpression.rawValue == "tuple_element_expr" ||
-                childExpression.rawValue == "keypath_expr" {
-                let source = analyzer.completeSource(expression: childExpression)
+            case "dot_self_expr":
+                let source = completion.completeSource(expression: childExpression)
+                let tokens = formatter.tokenize(source: wholeExpressionSource)
+                let column = columnInFunctionCall(start: wholeRange.start, target: partRange.end, tokens: tokens)
+                if source.hasPrefix(".") {
+                    values[column] = childExpression.type.replacingOccurrences(of: "@lvalue ", with: "") + formatter.format(source: source)
+                } else {
+                    values[column] = formatter.format(source: source)
+                }
+            case "tuple_element_expr", "keypath_expr":
+                let source = completion.completeSource(expression: childExpression)
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
                 let column = columnInFunctionCall(start: wholeRange.start, target: partRange.end, tokens: tokens)
                 values[column] = formatter.format(source: source) + " as \(childExpression.type!)"
-            }
-            if childExpression.rawValue == "string_literal_expr" {
+            case "string_literal_expr":
                 let source = stringLiteralExpression(childExpression, expression)
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
                 let column = columnInFunctionCall(start: wholeRange.start, target: partRange.end, tokens: tokens)
                 values[column] = formatter.format(source: source)
-            }
-            if childExpression.rawValue == "array_expr" ||
-                childExpression.rawValue == "dictionary_expr" ||
-                childExpression.rawValue == "object_literal" {
+            case "array_expr", "dictionary_expr", "object_literal":
                 let source = partExpressionSource
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
                 let column = columnInFunctionCall(start: wholeRange.start, target: childExpression.location, tokens: tokens)
                 values[column] = formatter.format(source: source) + " as \(childExpression.type!)"
-            }
-            if childExpression.rawValue == "subscript_expr" ||
-                childExpression.rawValue == "keypath_application_expr" ||
-                childExpression.rawValue == "objc_selector_expr" {
+            case "subscript_expr", "keypath_application_expr", "objc_selector_expr":
                 let source = partExpressionSource
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
                 let column = columnInFunctionCall(start: wholeRange.start, target: partRange.end, tokens: tokens)
                 values[column] = formatter.format(source: source)
-            }
-            if childExpression.rawValue == "call_expr" {
-                let source = analyzer.completeSource(expression: childExpression)
+            case "call_expr":
+                let source = completion.completeSource(expression: childExpression)
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
                 let column = columnInFunctionCall(start: wholeRange.start, target: childExpression.location, tokens: tokens)
                 let formatted = formatter.format(tokens: formatter.tokenize(source: source), withHint: childExpression)
@@ -249,9 +250,8 @@ class Transformer {
                 } else {
                     values[column] = formatted
                 }
-            }
-            if childExpression.rawValue == "binary_expr" || childExpression.rawValue == "prefix_unary_expr" {
-                let source = analyzer.completeSource(expression: childExpression)
+            case "binary_expr", "prefix_unary_expr":
+                let source = completion.completeSource(expression: childExpression)
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
                 var containsThrowsFunction = false
                 traverse(childExpression) { (expression, _) in
@@ -260,19 +260,18 @@ class Transformer {
                 }
                 let column = columnInFunctionCall(start: wholeRange.start, target: childExpression.location, tokens: tokens)
                 values[column] = (containsThrowsFunction ? "try! " : "") + formatter.format(source: source)
-            }
-            if childExpression.rawValue == "if_expr" {
-                let source = analyzer.completeSource(expression: childExpression)
+            case "if_expr":
+                let source = completion.completeSource(expression: childExpression)
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
                 let column = columnInFunctionCall(start: wholeRange.start, target: childExpression.location, tokens: tokens)
                 values[column] = formatter.format(source: source)
-            }
-            if childExpression.rawValue == "closure_expr" {
+            case "closure_expr":
                 stop = true
                 return
+            default:
+                break
             }
         }
-
         return values
     }
 
