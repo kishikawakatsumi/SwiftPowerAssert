@@ -26,7 +26,7 @@ do {
     let verbose = parser.add(option: "--verbose", kind: Bool.self, usage: "Show more debugging information")
 
     let test = parser.add(subparser: "test", overview: "Run swift test with power assertion")
-    let xtest = test.add(option: "-Xtest", kind: [String].self, strategy: .remaining, usage: "Arguments to pass to 'swift test' command")
+    let xswift = test.add(option: "-Xswift", kind: [String].self, strategy: .remaining, usage: "Arguments to pass to 'swift test' command")
 
     let xctest = parser.add(subparser: "xctest", overview: "Run XCTest with power assertion.")
     let xxcodebuild = xctest.add(option: "-Xxcodebuild", kind: [String].self, strategy: .remaining, usage: "Arguments to pass to 'xcodebuild' command")
@@ -38,7 +38,7 @@ do {
 
     switch result.subparser(parser) {
     case "test"?:
-        if let arguments = result.get(xtest) {
+        if let arguments = result.get(xswift) {
             let command = SwiftTestTool()
             try command.run(arguments: arguments, verbose: isVerbose)
         } else {
