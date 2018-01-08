@@ -31,14 +31,10 @@ struct XCTestTool {
         var iterator = xcarguments.enumerated().makeIterator()
         var buildActions = [(Int, String)]()
         var testOnlyOptions = [(Int, String)]()
-        var configurationOptionExists = false
         while let (index, option) = iterator.next() {
             switch option {
             case "-project", "-target", "-workspace", "-scheme", "-xcconfig", "-toolchain", "-find-executable",
                  "-find-library", "-resultBundlePath", "-derivedDataPath", "-archivePath", "-exportOptionsPlist":
-                _ = iterator.next()
-            case "-configuration":
-                configurationOptionExists = true
                 _ = iterator.next()
             case "-enableCodeCoverage", "-testLanguage", "-testRegion":
                 testOnlyOptions.append((index, option))
@@ -72,22 +68,39 @@ struct XCTestTool {
         let indicesToBeRemoved = buildActions.map { $0.0 } + testOnlyOptions.map{ $0.0 }
         let buildOptions = xcarguments.enumerated().filter { !indicesToBeRemoved.contains($0.offset) }.map { $0.element }
 
-        var additionalOptions = [String]()
-        if !configurationOptionExists {
-            additionalOptions.append("-configuration")
-            additionalOptions.append(targetBuildSettings.settings["CONFIGURATION"]!)
+        let log = try xcodebuild.build(arguments: buildOptions)
+        var swiftArguments = [String]()
+        let regex = try! NSRegularExpression(pattern: "^.+\\/swiftc\\s", options: [.caseInsensitive, .anchorsMatchLines])
+        log.enumerateLines { (line, stop) in
+            if let _ = regex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) {
+                let compileOptions = line.split(separator: " ")
+                var iterator = compileOptions.makeIterator()
+                while let option = iterator.next() {
+                    switch option {
+                    case "-sdk":
+                        let sdk = String(iterator.next()!)
+                        swiftArguments.append(String(option))
+                        swiftArguments.append(sdk)
+                        swiftArguments.append("-F")
+                        swiftArguments.append(sdk + "/../../../Developer/Library/Frameworks")
+                    case "-target":
+                        swiftArguments.append(String(option))
+                        swiftArguments.append(String(iterator.next()!))
+                    case "-F":
+                        swiftArguments.append(String(option))
+                        swiftArguments.append(String(iterator.next()!))
+                    case "-I":
+                        swiftArguments.append(String(option))
+                        swiftArguments.append(String(iterator.next()!))
+                    default:
+                        break
+                    }
+                }
+                stop = true
+            }
         }
-        try xcodebuild.build(arguments: buildOptions + additionalOptions)
 
         print("Transforming test files...")
-        let sdkName = targetBuildSettings.settings["SDK_NAME"]!
-        let sdkRoot = targetBuildSettings.settings["SDKROOT"]!
-        let platformName = targetBuildSettings.settings["PLATFORM_NAME"]!
-        let platformTargetPrefix = targetBuildSettings.settings["SWIFT_PLATFORM_TARGET_PREFIX"]!
-        let arch = targetBuildSettings.settings["arch"]!
-        let deploymentTargetSettingName = targetBuildSettings.settings["DEPLOYMENT_TARGET_SETTING_NAME"]!
-        let deploymentTarget = targetBuildSettings.settings[deploymentTargetSettingName]!
-        let builtProductsDirectory = targetBuildSettings.settings["BUILT_PRODUCTS_DIR"]!
 
         let temporaryDirectory: TemporaryDirectory
         do {
@@ -115,11 +128,7 @@ struct XCTestTool {
 
                 print("\tProcessing: \(source.lastPathComponent)")
                 let dependencies = sources.filter { $0 != source }
-                let options = BuildOptions(sdkName: sdkName, sdkRoot: sdkRoot,
-                                           platformName: platformName, platformTargetPrefix: platformTargetPrefix,
-                                           arch: arch, deploymentTarget: deploymentTarget,
-                                           dependencies: dependencies, builtProductsDirectory: builtProductsDirectory)
-                let processor = SwiftPowerAssert(buildOptions: options)
+                let processor = SwiftPowerAssert(buildOptions: swiftArguments, dependencies: dependencies)
                 let transformed = try processor.processFile(input: source, verbose: verbose)
                 do {
                     if let first = sources.first, first == source {
@@ -152,13 +161,14 @@ struct XCTestTool {
 private struct Xcodebuild {
     let exec = ["/usr/bin/xcrun", "xcodebuild"]
 
-    func build(arguments: [String]) throws {
-        let command = Process(arguments: exec + ["build"] + arguments)
+    func build(arguments: [String]) throws -> String {
+        let command = Process(arguments: exec + ["clean", "build"] + arguments)
         try! command.launch()
         let result = try! command.waitUntilExit()
+        let output = try! result.utf8Output()
         switch result.exitStatus {
         case .terminated(let code) where code == 0:
-            return
+            return output
         default:
             throw SwiftPowerAssertError.taskError("failed to run the following command: '\(command.arguments.joined(separator: " "))'")
         }
