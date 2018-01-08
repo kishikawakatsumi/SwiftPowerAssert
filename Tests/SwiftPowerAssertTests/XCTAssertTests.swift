@@ -19,7 +19,7 @@
 import XCTest
 
 class XCTAssertTests: XCTestCase {
-    func testBooleanAssertions() throws {
+    func testBooleanAssertions() {
         let source = """
             import XCTest
 
@@ -72,7 +72,7 @@ class XCTAssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testEqualityAssertions() throws {
+    func testEqualityAssertions() {
         let source = """
             import XCTest
 
@@ -115,7 +115,7 @@ class XCTAssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testComparableAssertions() throws {
+    func testComparableAssertions() {
         let source = """
             import XCTest
 
@@ -189,7 +189,7 @@ class XCTAssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testExtraParameters() throws {
+    func testExtraParameters() {
         let source = """
             import XCTest
 

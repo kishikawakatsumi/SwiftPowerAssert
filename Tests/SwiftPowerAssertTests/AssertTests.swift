@@ -19,7 +19,7 @@
 import XCTest
 
 class AssertTests: XCTestCase {
-    func testBinaryExpression1() throws {
+    func testBinaryExpression1() {
         let source = """
             import XCTest
 
@@ -55,7 +55,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testBinaryExpression2() throws {
+    func testBinaryExpression2() {
         let source = """
             import XCTest
 
@@ -91,7 +91,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testBinaryExpression3() throws {
+    func testBinaryExpression3() {
         let source = """
             import XCTest
 
@@ -120,7 +120,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testBinaryExpression4() throws {
+    func testBinaryExpression4() {
         let source = """
             import XCTest
 
@@ -150,7 +150,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testBinaryExpression5() throws {
+    func testBinaryExpression5() {
         let source = """
             import XCTest
 
@@ -194,7 +194,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testBinaryExpression6() throws {
+    func testBinaryExpression6() {
         let source = """
             import XCTest
 
@@ -223,7 +223,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testBinaryExpression7() throws {
+    func testBinaryExpression7() {
         let source = """
             import XCTest
 
@@ -254,7 +254,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testBinaryExpression8() throws {
+    func testBinaryExpression8() {
         let source = """
             import XCTest
 
@@ -299,7 +299,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testMultilineExpression1() throws {
+    func testMultilineExpression1() {
         let source = """
             import XCTest
 
@@ -355,7 +355,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testMultilineExpression2() throws {
+    func testMultilineExpression2() {
         let source = """
             import XCTest
 
@@ -411,7 +411,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testMultilineExpression3() throws {
+    func testMultilineExpression3() {
         let source = """
             import XCTest
 
@@ -448,7 +448,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testMultilineExpression4() throws {
+    func testMultilineExpression4() {
         let source = """
             import XCTest
 
@@ -506,7 +506,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testMultilineExpression5() throws {
+    func testMultilineExpression5() {
         let source = """
             import XCTest
 
@@ -541,7 +541,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testMultilineExpression6() throws {
+    func testMultilineExpression6() {
         let source = """
             import XCTest
 
@@ -577,7 +577,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testTryExpression() throws {
+    func testTryExpression() {
         let source = """
             import XCTest
 
@@ -636,7 +636,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testNilLiteral() throws {
+    func testNilLiteral() {
         let source = """
             import XCTest
 
@@ -661,7 +661,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testTernaryConditionalOperator() throws {
+    func testTernaryConditionalOperator() {
         let source = """
             import XCTest
 
@@ -688,7 +688,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testArrayLiteralExpression() throws {
+    func testArrayLiteralExpression() {
         let source = """
             import XCTest
 
@@ -716,7 +716,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testDictionaryLiteralExpression() throws {
+    func testDictionaryLiteralExpression() {
         let source = """
             import XCTest
 
@@ -744,7 +744,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testMagicLiteralExpression() throws {
+    func testMagicLiteralExpression() {
         let source = """
             import XCTest
 
@@ -783,7 +783,7 @@ class AssertTests: XCTestCase {
                        result.replacingOccurrences(of: "/.+\\.swift", with: "", options: .regularExpression))
     }
 
-    func testSelfExpression() throws {
+    func testSelfExpression() {
         func toStr<T>(value: T?) -> String {
             switch value {
             case .some(let value):
@@ -826,7 +826,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testImplicitMemberExpression() throws {
+    func testImplicitMemberExpression() {
         let source = """
             import XCTest
 
@@ -861,7 +861,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testTupleExpression() throws {
+    func testTupleExpression() {
         let source = """
             import XCTest
 
@@ -907,7 +907,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testKeyPathExpression() throws {
+    func testKeyPathExpression() {
         let source = """
             import XCTest
 
@@ -999,7 +999,7 @@ class AssertTests: XCTestCase {
     }
 
     #if swift(>=4.0.3)
-    func testSubscriptKeyPathExpression() throws {
+    func testSubscriptKeyPathExpression() {
         let source = """
             import XCTest
 
@@ -1093,7 +1093,7 @@ class AssertTests: XCTestCase {
     }
     #endif
 
-    func testInitializerExpression() throws {
+    func testInitializerExpression() {
         let source = """
             import XCTest
 
@@ -1122,7 +1122,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testPostfixSelfExpression() throws {
+    func testPostfixSelfExpression() {
         let source = """
             import XCTest
 
@@ -1146,7 +1146,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testForcedValueExpression() throws {
+    func testForcedValueExpression() {
         let source = """
             import XCTest
 
@@ -1180,7 +1180,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testOptionalChainingExpression() throws {
+    func testOptionalChainingExpression() {
         let source = """
             import XCTest
 
@@ -1249,7 +1249,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testNonAsciiCharacters() throws {
+    func testNonAsciiCharacters() {
         let source = """
             import XCTest
 
@@ -1394,7 +1394,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testConditionalCompilationBlock() throws {
+    func testConditionalCompilationBlock() {
         let source = """
             import XCTest
 
@@ -1432,7 +1432,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testSelectorExpression() throws {
+    func testSelectorExpression() {
         let source = """
             import XCTest
 
@@ -1470,7 +1470,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testExplicitMemberExpression() throws {
+    func testExplicitMemberExpression() {
         let source = """
             import XCTest
 
@@ -1500,7 +1500,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testMultipleStatementInClosure() throws {
+    func testMultipleStatementInClosure() {
         let source = """
             import XCTest
 
@@ -1535,7 +1535,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testMessageParameters() throws {
+    func testMessageParameters() {
         let source = """
             import XCTest
 
@@ -1565,7 +1565,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testStringContainsNewlines() throws {
+    func testStringContainsNewlines() {
         let source = """
             import XCTest
 
@@ -1591,7 +1591,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testStringContainsEscapeSequences() throws {
+    func testStringContainsEscapeSequences() {
         let source = """
             import XCTest
 
@@ -1732,7 +1732,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testMultilineStringLiterals() throws {
+    func testMultilineStringLiterals() {
         let source = """
             import XCTest
 
@@ -1783,7 +1783,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testCustomOperator() throws {
+    func testCustomOperator() {
         let source = """
             import XCTest
 
@@ -1848,7 +1848,7 @@ class AssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testNoWhitespaces() throws {
+    func testNoWhitespaces() {
         let source = """
             import XCTest
 
