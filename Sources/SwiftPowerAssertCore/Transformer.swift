@@ -57,6 +57,8 @@ class Transformer {
                                                  "XCTest.(file).XCTAssert(_:_:file:line:)",
                                                  "XCTest.(file).XCTAssertTrue(_:_:file:line:)",
                                                  "XCTest.(file).XCTAssertFalse(_:_:file:line:)",
+                                                 "XCTest.(file).XCTAssertNil(_:_:file:line:)",
+                                                 "XCTest.(file).XCTAssertNotNil(_:_:file:line:)",
                                                  "XCTest.(file).XCTAssertEqual(_:_:_:file:line:)",
                                                  "XCTest.(file).XCTAssertNotEqual(_:_:_:file:line:)",
                                                  "XCTest.(file).XCTAssertGreaterThan(_:_:_:file:line:)",
@@ -122,6 +124,12 @@ class Transformer {
                  "XCTest.(file).XCTAssertTrue(_:_:file:line:)":
                 let values = recordValues(expression, 1)
                 return instrument(expression: expression, with: values)
+            case "XCTest.(file).XCTAssertNil(_:_:file:line:)":
+                let values = recordValues(expression, 1)
+                return instrument(nil: expression, with: values)
+            case "XCTest.(file).XCTAssertNotNil(_:_:file:line:)":
+                let values = recordValues(expression, 1)
+                return instrument(nil: expression, with: values, failureCondition: true)
             case "XCTest.(file).XCTAssertFalse(_:_:file:line:)":
                 let values = recordValues(expression, 1)
                 return instrument(expression: expression, with: values, failureCondition: true)
@@ -242,14 +250,20 @@ class Transformer {
                 let source = completion.completeSource(expression: childExpression)
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
                 let column = columnInFunctionCall(start: wholeRange.start, target: childExpression.location, tokens: tokens)
-                let formatted = formatter.format(tokens: formatter.tokenize(source: source), withHint: childExpression)
+                var formatted = formatter.format(tokens: formatter.tokenize(source: source), withHint: childExpression)
                 if !childExpression.expressions.isEmpty && childExpression.throwsModifier == "throws" {
-                    values[column] = "try! " + formatted
-                } else if childExpression.argumentLabels == "nilLiteral:" {
-                    values[column] = formatted + " as \(childExpression.type!)"
-                } else {
-                    values[column] = formatted
+                    formatted = "try! " + formatted
                 }
+                if source.hasPrefix(".") || childExpression.argumentLabels == "nilLiteral:" {
+                    formatted = formatted + " as \(childExpression.type!)"
+                }
+                values[column] = formatted
+            case "dot_syntax_call_expr" where !childExpression.type.contains("->"):
+                let source = completion.completeSource(expression: childExpression)
+                let tokens = formatter.tokenize(source: wholeExpressionSource)
+                let column = columnInFunctionCall(start: wholeRange.start, target: childExpression.location, tokens: tokens)
+                let formatted = formatter.format(tokens: formatter.tokenize(source: source), withHint: childExpression)
+                values[column] = formatted + " as \(childExpression.type!)"
             case "binary_expr", "prefix_unary_expr":
                 let source = completion.completeSource(expression: childExpression)
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
@@ -290,6 +304,17 @@ class Transformer {
         let formatter = SourceFormatter()
         let recordValues = recordValuesCodeFragment(values: values)
         let condition = "__Util.equal(\(formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource), withHint: tupleExpression)))"
+        let assertion = formatter.escaped(tokens: formatter.tokenize(source: expressionSource), withHint: tupleExpression)
+        return instrument(expression: expression, recordValues: recordValues, condition: condition, assertion: assertion, failureCondition: failureCondition)
+    }
+
+    private func instrument(nil expression: Expression, with values: [Int: String], failureCondition: Bool = false) -> String {
+        let expressionSource = sourceFile[expression.range]
+        let tupleExpression = expression.expressions[1]
+        let tupleExpressionSource = sourceFile[tupleExpression.range]
+        let formatter = SourceFormatter()
+        let recordValues = recordValuesCodeFragment(values: values)
+        let condition = "__Util.`nil`(\(formatter.format(tokens: formatter.tokenize(source: tupleExpressionSource), withHint: tupleExpression)))"
         let assertion = formatter.escaped(tokens: formatter.tokenize(source: expressionSource), withHint: tupleExpression)
         return instrument(expression: expression, recordValues: recordValues, condition: condition, assertion: assertion, failureCondition: failureCondition)
     }
@@ -337,6 +362,12 @@ class Transformer {
                 }
                 static func equal(_ parameters: (condition: Bool, message: String)) -> Bool {
                     return parameters.condition
+                }
+                static func `nil`(_ parameters: (Any?)) -> Bool {
+                    return parameters == nil
+                }
+                static func `nil`(_ parameters: (condition: Any?, message: String)) -> Bool {
+                    return parameters.condition == nil
                 }
                 static func equal<T>(_ parameters: (lhs: T, rhs: T)) -> Bool where T: Equatable {
                     return parameters.lhs == parameters.rhs

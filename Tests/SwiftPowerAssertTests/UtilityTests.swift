@@ -20,7 +20,7 @@ import XCTest
 import SwiftPowerAssertCore
 
 class UtilityTests: XCTestCase {
-    func testDisplayWidth() throws {
+    func testDisplayWidth() {
         XCTAssertEqual(__DisplayWidth.of("Katsumi Kishikawa", inEastAsian: true), 17)
         XCTAssertEqual(__DisplayWidth.of("岸川克己", inEastAsian: true), 8)
         XCTAssertEqual(__DisplayWidth.of("岸川 克己", inEastAsian: true), 9)

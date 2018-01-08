@@ -19,7 +19,7 @@
 import XCTest
 
 class XCTAssertTests: XCTestCase {
-    func testBooleanAssertions() throws {
+    func testBooleanAssertions() {
         let source = """
             import XCTest
 
@@ -72,7 +72,7 @@ class XCTAssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testEqualityAssertions() throws {
+    func testEqualityAssertions() {
         let source = """
             import XCTest
 
@@ -115,7 +115,7 @@ class XCTAssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testComparableAssertions() throws {
+    func testComparableAssertions() {
         let source = """
             import XCTest
 
@@ -189,7 +189,61 @@ class XCTAssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
-    func testExtraParameters() throws {
+    func testNilAssertions() {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    struct Test {
+                        let value: Value
+                        init?(rawValue: Int) {
+                            if let value = Value(rawValue: rawValue) {
+                                self.value = value
+                            } else {
+                                return nil
+                            }
+                        }
+                    }
+
+                    enum Value: Int {
+                        case first = 1
+                    }
+
+                    let test1 = Test(rawValue: 1)
+                    XCTAssertNil(test1)
+                    XCTAssertNil(test1?.value)
+
+                    let test2 = Test(rawValue: 5)
+                    XCTAssertNotNil(test2)
+                    XCTAssertNotNil(test2?.value)
+                }
+            }
+
+            """
+
+        let expected = """
+            XCTAssertNil(test1)
+                         |
+                         Test #1(value: Value #1 in main.Tests.testMethod() -> ().first)
+            XCTAssertNil(test1?.value)
+                         |      |
+                         |      first
+                         Test #1(value: Value #1 in main.Tests.testMethod() -> ().first)
+            XCTAssertNotNil(test2)
+                            |
+                            nil
+            XCTAssertNotNil(test2?.value)
+                            |      |
+                            nil    nil
+
+            """
+
+        let result = TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
+    func testExtraParameters() {
         let source = """
             import XCTest
 
@@ -225,6 +279,158 @@ class XCTAssertTests: XCTestCase {
                               |        |   Foo(val: 2)
                               |        Bar(foo: main.Foo(val: 2), val: 3)
                               Bar(foo: main.Foo(val: 2), val: 3)
+
+            """
+
+        let result = TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
+    func testRawRepresentableString() {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    struct Test {
+                        let suit: Suits
+                        init(suit: String) {
+                            self.suit = Suits(rawValue: suit)!
+                        }
+                    }
+
+                    enum Suits: String {
+                        case hearts = "hearts"
+                    }
+
+                    let test = Test(suit: "hearts")
+                    XCTAssertTrue(test.suit != .hearts)
+                }
+            }
+
+            """
+
+        let expected = """
+            XCTAssertTrue(test.suit != .hearts)
+                          |    |    |   |
+                          |    |    |   hearts
+                          |    |    false
+                          |    hearts
+                          Test #1(suit: Suits #1 in main.Tests.testMethod() -> ().hearts)
+
+            """
+
+        let result = TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
+    func testRawRepresentableNumber() {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    struct Test {
+                        let value: Value
+                        init?(rawValue: Int) {
+                            if let value = Value(rawValue: rawValue) {
+                                self.value = value
+                            } else {
+                                return nil
+                            }
+                        }
+                    }
+
+                    enum Value: Int {
+                        case first = 1
+                    }
+
+                    let test1 = Test(rawValue: 1)
+                    XCTAssertTrue(test1?.value != .first)
+
+                    let test2 = Test(rawValue: 5)
+                    XCTAssertTrue(test2?.value == .first)
+                }
+            }
+
+            """
+
+        let expected = """
+            XCTAssertTrue(test1?.value != .first)
+                          |      |     |   |
+                          |      first |   first
+                          |            false
+                          Test #1(value: Value #1 in main.Tests.testMethod() -> ().first)
+            XCTAssertTrue(test2?.value == .first)
+                          |      |     |   |
+                          nil    nil   |   first
+                                       false
+
+            """
+
+        let result = TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
+    func testNoOutputWhenSucceeded() {
+        let source = """
+            import XCTest
+
+            struct Bar {
+                let foo: Foo
+                var val: Int
+            }
+
+            struct Foo {
+                var val: Int
+            }
+
+            struct Test {
+                let value: Value
+                init?(rawValue: Int) {
+                    if let value = Value(rawValue: rawValue) {
+                        self.value = value
+                    } else {
+                        return nil
+                    }
+                }
+            }
+
+            enum Value: Int {
+                case first = 1
+            }
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    let bar = Bar(foo: Foo(val: 2), val: 3)
+                    XCTAssert(bar.val != bar.foo.val)
+                    XCTAssert(bar.val == bar.foo.val + 1)
+                    XCTAssertTrue(bar.val != bar.foo.val)
+                    XCTAssertFalse(bar.val == bar.foo.val)
+
+                    XCTAssertEqual(bar.val, bar.foo.val + 1)
+                    XCTAssertNotEqual(bar.val, bar.foo.val)
+
+                    XCTAssertGreaterThan(bar.val, bar.foo.val)
+                    XCTAssertGreaterThanOrEqual(bar.val, bar.foo.val)
+                    XCTAssertGreaterThanOrEqual(bar.val, bar.foo.val + 1)
+                    XCTAssertLessThanOrEqual(bar.foo.val, bar.val)
+                    XCTAssertLessThanOrEqual(bar.foo.val + 1, bar.val)
+                    XCTAssertLessThan(bar.foo.val, bar.val)
+
+                    let test1 = Test(rawValue: 5)
+                    XCTAssertNil(test1)
+                    XCTAssertNil(test1?.value)
+
+                    let test2 = Test(rawValue: 1)
+                    XCTAssertNotNil(test2)
+                    XCTAssertNotNil(test2?.value)
+                }
+            }
+
+            """
+
+        let expected = """
 
             """
 
