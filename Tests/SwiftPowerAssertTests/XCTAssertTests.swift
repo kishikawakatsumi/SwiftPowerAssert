@@ -189,6 +189,60 @@ class XCTAssertTests: XCTestCase {
         XCTAssertEqual(expected, result)
     }
 
+    func testNilAssertions() {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testMethod() {
+                    struct Test {
+                        let value: Value
+                        init?(rawValue: Int) {
+                            if let value = Value(rawValue: rawValue) {
+                                self.value = value
+                            } else {
+                                return nil
+                            }
+                        }
+                    }
+
+                    enum Value: Int {
+                        case first = 1
+                    }
+
+                    let test1 = Test(rawValue: 1)
+                    XCTAssertNil(test1)
+                    XCTAssertNil(test1?.value)
+
+                    let test2 = Test(rawValue: 5)
+                    XCTAssertNotNil(test2)
+                    XCTAssertNotNil(test2?.value)
+                }
+            }
+
+            """
+
+        let expected = """
+            XCTAssertNil(test1)
+                         |
+                         Test #1(value: Value #1 in main.Tests.testMethod() -> ().first)
+            XCTAssertNil(test1?.value)
+                         |      |
+                         |      first
+                         Test #1(value: Value #1 in main.Tests.testMethod() -> ().first)
+            XCTAssertNotNil(test2)
+                            |
+                            nil
+            XCTAssertNotNil(test2?.value)
+                            |      |
+                            nil    nil
+
+            """
+
+        let result = TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
     func testExtraParameters() {
         let source = """
             import XCTest
