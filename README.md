@@ -60,8 +60,30 @@ Note: SwiftPowerAssert injects instrument code into the `XCTAssert()` methods du
 Usage
 ---------------------------------------
 
+If you are using `xcodebuild test` command, add `swift-power-assert xctest -X` before like the following.
+
 ```shell
-/path/to/swift-power-assert test --xcargs -workspace SwiftPowerAssert.xcworkspace -scheme "SwiftPowerAssert" -sdk iphonesimulator -destination "name=iPhone SE,OS=10.3.1" test
+/path/to/swift-power-assert xctest -Xxcodebuild test -workspace <workspacename> -scheme <schemeName> -sdk iphonesimulator -destination "name=iPhone X,OS=11.2"
+```
+
+If you are using `swift test`, like the following.
+
+```shell
+/path/to/swift-power-assert test -Xswift test
+```
+
+```shell
+/path/to/swift-power-assert test -Xswift test -c release
+```
+
+Nothing happens? If the test succeeds, nothing is output. If you always want to see rich ASCII art, enable the `--verbose` option. always output a diagram regardless of the success or failure of assertions.
+
+```shell
+/path/to/swift-power-assert --verbose xctest -Xxcodebuild test -workspace <workspacename> -scheme <schemeName> -sdk iphonesimulator -destination "name=iPhone X,OS=11.2"
+```
+
+```shell
+/path/to/swift-power-assert --verbose test -Xswift test
 ```
 
 Author
