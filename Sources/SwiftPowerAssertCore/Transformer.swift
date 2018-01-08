@@ -250,14 +250,20 @@ class Transformer {
                 let source = completion.completeSource(expression: childExpression)
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
                 let column = columnInFunctionCall(start: wholeRange.start, target: childExpression.location, tokens: tokens)
-                let formatted = formatter.format(tokens: formatter.tokenize(source: source), withHint: childExpression)
+                var formatted = formatter.format(tokens: formatter.tokenize(source: source), withHint: childExpression)
                 if !childExpression.expressions.isEmpty && childExpression.throwsModifier == "throws" {
-                    values[column] = "try! " + formatted
-                } else if childExpression.argumentLabels == "nilLiteral:" {
-                    values[column] = formatted + " as \(childExpression.type!)"
-                } else {
-                    values[column] = formatted
+                    formatted = "try! " + formatted
                 }
+                if source.hasPrefix(".") || childExpression.argumentLabels == "nilLiteral:" {
+                    formatted = formatted + " as \(childExpression.type!)"
+                }
+                values[column] = formatted
+            case "dot_syntax_call_expr" where !childExpression.type.contains("->"):
+                let source = completion.completeSource(expression: childExpression)
+                let tokens = formatter.tokenize(source: wholeExpressionSource)
+                let column = columnInFunctionCall(start: wholeRange.start, target: childExpression.location, tokens: tokens)
+                let formatted = formatter.format(tokens: formatter.tokenize(source: source), withHint: childExpression)
+                values[column] = formatted + " as \(childExpression.type!)"
             case "binary_expr", "prefix_unary_expr":
                 let source = completion.completeSource(expression: childExpression)
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
