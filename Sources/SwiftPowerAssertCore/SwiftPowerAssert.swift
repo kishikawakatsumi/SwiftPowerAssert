@@ -20,10 +20,12 @@ import Foundation
 import Basic
 
 public final class SwiftPowerAssert {
-    private let buildOptions: BuildOptions
+    private let buildOptions: [String]
+    private let dependencies: [URL]
 
-    public init(buildOptions: BuildOptions) {
+    public init(buildOptions: [String], dependencies: [URL]) {
         self.buildOptions = buildOptions
+        self.dependencies = dependencies
     }
 
     public func processFile(input: URL, verbose: Bool = false) throws -> String {
@@ -52,19 +54,10 @@ public final class SwiftPowerAssert {
             "/usr/bin/xcrun",
             "swift",
             "-frontend",
-            "-target",
-            buildOptions.targetTriple,
-            "-sdk",
-            buildOptions.sdkRoot,
-            "-F",
-            "\(buildOptions.sdkRoot)/../../../Developer/Library/Frameworks",
-            "-F",
-            buildOptions.builtProductsDirectory,
-            "-I",
-            buildOptions.builtProductsDirectory,
+            "-parse-as-library",
             "-dump-ast"
         ]
-        return arguments + ["-primary-file", source.path] + buildOptions.dependencies.filter { $0 != source }.map { $0.path }
+        return arguments + buildOptions + ["-primary-file", source.path] + dependencies.map { $0.path }
     }
 
     private func dumpAST(arguments: [String]) throws -> String {
@@ -109,5 +102,75 @@ public final class SwiftPowerAssert {
     private func transform(source: String, root: AST, verbose: Bool = false) -> String {
         let transformer = Transformer(source: source, verbose: verbose)
         return transformer.transform(node: root)
+    }
+}
+
+public enum SDK {
+    case macosx
+    case iphoneos
+    case iphonesimulator
+    case watchos
+    case watchsimulator
+    case appletvos
+    case appletvsimulator
+
+    public var name: String {
+        switch self {
+        case .macosx:
+            return "macosx"
+        case .iphoneos:
+            return "iphoneos"
+        case .iphonesimulator:
+            return "iphonesimulator"
+        case .watchos:
+            return "watchos"
+        case .watchsimulator:
+            return "watchsimulator"
+        case .appletvos:
+            return "appletvos"
+        case .appletvsimulator:
+            return "appletvsimulator"
+        }
+    }
+
+    public var os: String {
+        switch self {
+        case .macosx:
+            return "macosx"
+        case .iphoneos, .iphonesimulator:
+            return "ios"
+        case .watchos, .watchsimulator:
+            return "watchos"
+        case .appletvos, .appletvsimulator:
+            return "tvos"
+        }
+    }
+
+    public func path() throws -> String {
+        let shell = Process(arguments: ["/usr/bin/xcrun", "--sdk", name, "--show-sdk-path"])
+        try! shell.launch()
+        let result = try! shell.waitUntilExit()
+        let output = try! result.utf8Output()
+        switch result.exitStatus {
+        case .terminated(let code) where code == 0:
+            return output.trimmingCharacters(in: .whitespacesAndNewlines)
+        default:
+            let error = try! result.utf8stderrOutput()
+            throw SwiftPowerAssertError.taskError(error)
+        }
+    }
+
+    public func version() throws -> String {
+        let shell = Process(arguments: ["defaults", "read", "\(try path())/SDKSettings.plist", "Version"])
+        try! shell.launch()
+        let result = try! shell.waitUntilExit()
+        let output = try! result.utf8Output()
+        switch result.exitStatus {
+        case .terminated(let code) where code == 0:
+            return output.trimmingCharacters(in: .whitespacesAndNewlines)
+        default:
+            let error = try! result.utf8stderrOutput()
+            throw SwiftPowerAssertError.taskError(error)
+        }
     }
 }

@@ -64,6 +64,7 @@ struct SwiftTestTool {
             throw SwiftPowerAssertError.noUnitTestBundle
         }
 
+        print("Build projedt target and dependencies...")
         let swiftBuild = SwiftBuild()
         var swiftBuildArgument = [String]()
         if let configurationArgument = configurationArgument {
@@ -99,9 +100,6 @@ struct SwiftTestTool {
             }
         }
 
-        let hostTriple = Triple.hostTriple
-        let triple = hostTriple.tripleString
-
         let configuration: String
         if let configurationArgument = configurationArgument {
             configuration = configurationArgument
@@ -109,15 +107,40 @@ struct SwiftTestTool {
             configuration = "debug"
         }
 
-        let sdk = SDK.macosx
-        let sdkName = sdk.name
-        let sdkRoot = try! sdk.path()
-        let platformName = sdkName
-        let platformTargetPrefix = platformName
-        let arch = hostTriple.arch.rawValue
-        let deploymentTarget = "10.10"
-        let builtProductsDirectory = buildPath.appendingPathComponent(triple).appendingPathComponent(configuration).path
-        
+        let sdk = try! SDK.macosx.path()
+        let targetTriple = "x86_64-apple-macosx10.10"
+        let buildDirectory = buildPath.appendingPathComponent(targetTriple).appendingPathComponent(configuration).path
+
+        let rawDependencies = try swiftPackage.showDependencies(packagePath: packagePathArgument, buildPath: buildPathArgument)
+
+        let dependency = try! JSONDecoder().decode(Dependency.self, from: rawDependencies.data(using: .utf8)!)
+
+        var modulemapPaths = [String]()
+        func findModules(_ dependencies: [Dependency]) {
+            for dependency in dependencies {
+                var isDirectory: ObjCBool = false
+                let modulemapPath = URL(fileURLWithPath: dependency.path).appendingPathComponent("module.modulemap").path
+                if FileManager.default.fileExists(atPath: modulemapPath, isDirectory: &isDirectory) && !isDirectory.boolValue {
+                    modulemapPaths.append(modulemapPath)
+                }
+                findModules(dependency.dependencies)
+            }
+        }
+        findModules(dependency.dependencies)
+
+        let swiftArguments = [
+            "-sdk",
+            sdk,
+            "-target",
+            targetTriple,
+            "-F",
+            sdk + "/../../../Developer/Library/Frameworks",
+            "-F",
+            buildDirectory,
+            "-I",
+            buildDirectory
+        ] + modulemapPaths.flatMap { ["-Xcc", "-fmodule-map-file=\($0)"] }
+
         for testTypeTerget in testTypeTergets {
             let path = URL(fileURLWithPath: testTypeTerget.path)
             let sources = testTypeTerget.sources.map { path.appendingPathComponent($0) }
@@ -135,11 +158,7 @@ struct SwiftTestTool {
 
                     print("\tProcessing: \(source.lastPathComponent)")
                     let dependencies = sources.filter { $0 != source }
-                    let options = BuildOptions(sdkName: sdkName, sdkRoot: sdkRoot,
-                                               platformName: platformName, platformTargetPrefix: platformTargetPrefix,
-                                               arch: arch, deploymentTarget: deploymentTarget,
-                                               dependencies: dependencies, builtProductsDirectory: builtProductsDirectory)
-                    let processor = SwiftPowerAssert(buildOptions: options)
+                    let processor = SwiftPowerAssert(buildOptions: swiftArguments + ["-module-name", testTypeTerget.name], dependencies: dependencies)
                     let transformed = try processor.processFile(input: source, verbose: verbose)
                     do {
                         if let first = sources.first, first == source {
@@ -183,6 +202,30 @@ private struct SwiftPackage {
             packageOptions.append(contentsOf: ["--build-path", buildPath])
         }
         let command = Process(arguments: exec + packageOptions + ["describe", "--type", "json"])
+        try! command.launch()
+        let result = try! command.waitUntilExit()
+        let output = try! result.utf8Output()
+        switch result.exitStatus {
+        case .terminated(let code) where code == 0:
+            let index = output.index { $0 == "{" }
+            if let index = index {
+                return String(output[index...])
+            }
+            return output
+        default:
+            throw SwiftPowerAssertError.taskError("failed to run the following command: '\(command.arguments.joined(separator: " "))'")
+        }
+    }
+
+    func showDependencies(packagePath: String?, buildPath: String?) throws -> String {
+        var packageOptions = [String]()
+        if let packagePath = packagePath {
+            packageOptions.append(contentsOf: ["--package-path", packagePath])
+        }
+        if let buildPath = buildPath {
+            packageOptions.append(contentsOf: ["--build-path", buildPath])
+        }
+        let command = Process(arguments: exec + packageOptions + ["show-dependencies", "--format", "json"])
         try! command.launch()
         let result = try! command.waitUntilExit()
         let output = try! result.utf8Output()
@@ -255,102 +298,10 @@ private struct Target: Decodable {
     }
 }
 
-private struct Triple {
-    public let tripleString: String
-
-    public let arch: Arch
-    public let vendor: Vendor
-    public let os: OS
-    public let abi: ABI
-
-    public enum Error: Swift.Error {
-        case badFormat
-        case unknownArch
-        case unknownOS
-    }
-
-    public enum Arch: String {
-        case x86_64
-        case armv7
-        case s390x
-    }
-
-    public enum Vendor: String {
-        case unknown
-        case apple
-    }
-
-    public enum OS: String {
-        case darwin
-        case macOS = "macosx"
-        case linux
-
-        fileprivate static let allKnown:[OS] = [
-            .darwin,
-            .macOS,
-            .linux
-        ]
-    }
-
-    public enum ABI: String {
-        case unknown
-        case android = "androideabi"
-    }
-
-    public init(_ string: String) throws {
-        let components = string.split(separator: "-").map(String.init)
-
-        guard components.count == 3 || components.count == 4 else {
-            throw Error.badFormat
-        }
-
-        guard let arch = Arch(rawValue: components[0]) else {
-            throw Error.unknownArch
-        }
-
-        let vendor = Vendor(rawValue: components[1]) ?? .unknown
-
-        guard let os = Triple.parseOS(components[2]) else {
-            throw Error.unknownOS
-        }
-
-        let abiString = components.count > 3 ? components[3] : nil
-        let abi = abiString.flatMap(ABI.init)
-
-        self.tripleString = string
-        self.arch = arch
-        self.vendor = vendor
-        self.os = os
-        self.abi = abi ?? .unknown
-    }
-
-    fileprivate static func parseOS(_ string: String) -> OS? {
-        for candidate in OS.allKnown {
-            if string.hasPrefix(candidate.rawValue) {
-                return candidate
-            }
-        }
-
-        return nil
-    }
-
-    public func isDarwin() -> Bool {
-        return vendor == .apple || os == .macOS || os == .darwin
-    }
-
-    public func isLinux() -> Bool {
-        return os == .linux
-    }
-
-    public static let macOS = try! Triple("x86_64-apple-macosx10.10")
-    public static let linux = try! Triple("x86_64-unknown-linux")
-    public static let android = try! Triple("armv7-unknown-linux-androideabi")
-
-  #if os(macOS)
-    public static let hostTriple: Triple = .macOS
-  #elseif os(Linux) && arch(s390x)
-    public static let hostTriple: Triple = try! Triple("s390x-unknown-linux")
-  #else
-    public static let hostTriple: Triple = .linux
-  #endif
+private struct Dependency: Decodable {
+    let name: String
+    let path: String
+    let url: String
+    let version: String
+    let dependencies: [Dependency]
 }

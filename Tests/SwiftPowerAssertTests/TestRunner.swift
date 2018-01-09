@@ -39,14 +39,27 @@ class TestRunner {
     private lazy var executablePath = {
         return sourceFilePath + ".o"
     }()
-    private lazy var options: BuildOptions = {
-        let sdk = SDK.macosx
-        let sdkPath = try! sdk.path()
-        let sdkVersion = try! sdk.version()
-        return BuildOptions(sdkName: sdk.name + sdkVersion, sdkRoot: sdkPath,
-                            platformName: sdk.name, platformTargetPrefix: sdk.os,
-                            arch: "x86_64", deploymentTarget: sdkVersion,
-                            dependencies: [], builtProductsDirectory: temporaryDirectory.path.asString)
+    private lazy var sdk = {
+        return try! SDK.macosx.path()
+    }()
+    private var targetTriple: String {
+        return "x86_64-apple-macosx10.10"
+    }
+    private lazy var options: [String] = {
+        let targetTriple = "x86_64-apple-macosx10.10"
+        let buildDirectory = temporaryDirectory.path.asString
+        return [
+            "-sdk",
+            sdk,
+            "-target",
+            targetTriple,
+            "-F",
+            sdk + "/../../../Developer/Library/Frameworks",
+            "-F",
+            buildDirectory,
+            "-I",
+            buildDirectory
+        ]
     }()
 
     func run(source: String) -> String {
@@ -61,7 +74,7 @@ class TestRunner {
 
     private func prepare(source: String) {
         try! source.write(toFile: sourceFilePath, atomically: true, encoding: .utf8)
-        let processor = SwiftPowerAssert(buildOptions: options)
+        let processor = SwiftPowerAssert(buildOptions: options, dependencies: [])
         do {
             let transformed = try processor.processFile(input: URL(fileURLWithPath: sourceFilePath))
             try! transformed.write(toFile: sourceFilePath, atomically: true, encoding: .utf8)
@@ -90,15 +103,15 @@ class TestRunner {
             "-o",
             executablePath,
             "-target",
-            options.targetTriple,
+            targetTriple,
             "-sdk",
-            options.sdkRoot,
+            sdk,
             "-F",
-            "\(options.sdkRoot)/../../../Developer/Library/Frameworks",
+            "\(sdk)/../../../Developer/Library/Frameworks",
             "-Xlinker",
             "-rpath",
             "-Xlinker",
-            "\(options.sdkRoot)/../../../Developer/Library/Frameworks",
+            "\(sdk)/../../../Developer/Library/Frameworks",
         ]
 
         let process = Process(arguments: arguments)
