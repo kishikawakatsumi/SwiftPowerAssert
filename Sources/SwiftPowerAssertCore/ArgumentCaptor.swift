@@ -71,12 +71,44 @@ struct ArgumentCaptor {
                 let source = completion.completeSource(expression: childExpression)
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
                 let column = columnInFunctionCall(start: wholeRange.start, target: partRange.end, tokens: tokens)
+
+                // FIXME
+                var containsThrowsFunction = false
+                traverse(childExpression) { (expression, _) in
+                    guard !containsThrowsFunction else { return }
+                    containsThrowsFunction = expression.rawValue == "call_expr" && expression.throwsModifier == "throws"
+                }
+                var partTokens = formatter.tokenize(source: source)
+                if containsThrowsFunction {
+                    var iterator = partTokens.enumerated().makeIterator()
+                    var tryOperatorIndices = [Int]()
+                    while let (index, token) = iterator.next() {
+                        switch token.type {
+                        case .token where token.value == "try":
+                            tryOperatorIndices.append(index)
+                            if let (index, token) = iterator.next() {
+                                switch token.type {
+                                case .token where token.value == "?" ||  token.value == "!":
+                                    tryOperatorIndices.append(index)
+                                default:
+                                    break
+                                }
+                            }
+                        default:
+                            break
+                        }
+                    }
+                    for index in tryOperatorIndices {
+                        partTokens.remove(at: index)
+                    }
+                }
+
                 if source.hasPrefix(".") {
-                    let text = childExpression.type.replacingOccurrences(of: "@lvalue ", with: "") + formatter.format(source: source)
+                    let text = (containsThrowsFunction ? "try! " : "") + childExpression.type.replacingOccurrences(of: "@lvalue ", with: "") + formatter.format(tokens: partTokens)
                     let capturedExpression = CapturedExpression(text: text, column: column, expression: childExpression)
                     capturedExpressions.append(capturedExpression)
                 } else {
-                    let text = formatter.format(source: source)
+                    let text = (containsThrowsFunction ? "try! " : "") + formatter.format(tokens: partTokens)
                     let capturedExpression = CapturedExpression(text: text, column: column, expression: childExpression)
                     capturedExpressions.append(capturedExpression)
                 }
@@ -128,15 +160,39 @@ struct ArgumentCaptor {
                 }
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
                 let column = columnInFunctionCall(start: wholeRange.start, target: childExpression.location, tokens: tokens)
-                var formatted = formatter.format(tokens: formatter.tokenize(source: source), withHint: childExpression)
+
+                // FIXME
+                var partTokens = formatter.tokenize(source: source)
+                var formatted = formatter.format(tokens: partTokens, withHint: childExpression)
                 if !childExpression.expressions.isEmpty && childExpression.throwsModifier == "throws" {
-                    formatted = "try! " + formatted
+                    var iterator = partTokens.enumerated().makeIterator()
+                    var tryOperatorIndices = [Int]()
+                    while let (index, token) = iterator.next() {
+                        switch token.type {
+                        case .token where token.value == "try":
+                            tryOperatorIndices.append(index)
+                            if let (index, token) = iterator.next() {
+                                switch token.type {
+                                case .token where token.value == "?" ||  token.value == "!":
+                                    tryOperatorIndices.append(index)
+                                default:
+                                    break
+                                }
+                            }
+                        default:
+                            break
+                        }
+                    }
+                    for index in tryOperatorIndices {
+                        partTokens.remove(at: index)
+                    }
+                    formatted = "try " + formatter.format(tokens: partTokens)
                 }
                 if source.hasPrefix(".") || childExpression.argumentLabels == "nilLiteral:" {
                     formatted = formatted + " as \(childExpression.type!)"
                 }
-                let text = formatted
-                let capturedExpression = CapturedExpression(text: text, column: column, expression: childExpression)
+
+                let capturedExpression = CapturedExpression(text: formatted, column: column, expression: childExpression)
                 capturedExpressions.append(capturedExpression)
             case "dot_syntax_call_expr" where !childExpression.type.contains("->"):
                 let source = completion.completeSource(expression: childExpression)
@@ -149,13 +205,39 @@ struct ArgumentCaptor {
             case "binary_expr", "prefix_unary_expr":
                 let source = completion.completeSource(expression: childExpression)
                 let tokens = formatter.tokenize(source: wholeExpressionSource)
+                let column = columnInFunctionCall(start: wholeRange.start, target: childExpression.location, tokens: tokens)
+
+                // FIXME
                 var containsThrowsFunction = false
                 traverse(childExpression) { (expression, _) in
                     guard !containsThrowsFunction else { return }
                     containsThrowsFunction = expression.rawValue == "call_expr" && expression.throwsModifier == "throws"
                 }
-                let column = columnInFunctionCall(start: wholeRange.start, target: childExpression.location, tokens: tokens)
-                let text = (containsThrowsFunction ? "try! " : "") + formatter.format(source: source)
+                var partTokens = formatter.tokenize(source: source)
+                if containsThrowsFunction {
+                    var iterator = partTokens.enumerated().makeIterator()
+                    var tryOperatorIndices = [Int]()
+                    while let (index, token) = iterator.next() {
+                        switch token.type {
+                        case .token where token.value == "try":
+                            tryOperatorIndices.append(index)
+                            if let (index, token) = iterator.next() {
+                                switch token.type {
+                                case .token where token.value == "?" ||  token.value == "!":
+                                    tryOperatorIndices.append(index)
+                                default:
+                                    break
+                                }
+                            }
+                        default:
+                            break
+                        }
+                    }
+                    for index in tryOperatorIndices {
+                        partTokens.remove(at: index)
+                    }
+                }
+                let text = (containsThrowsFunction ? "try! " : "") + formatter.format(tokens: partTokens)
                 let capturedExpression = CapturedExpression(text: text, column: column, expression: childExpression)
                 capturedExpressions.append(capturedExpression)
             case "if_expr":
@@ -173,6 +255,7 @@ struct ArgumentCaptor {
             }
         }
 
+        // FIXME
         var expressions = [CapturedExpression]()
         let groupedExpressions = Dictionary(grouping: capturedExpressions) { $0.column }
         let conflicts = groupedExpressions.filter { $1.count > 1 }

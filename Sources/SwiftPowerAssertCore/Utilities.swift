@@ -3,7 +3,6 @@
 //===----------------------------------------------------------------------===//
 
 import Foundation
-import XCTest
 
 public struct __Util {}
 extension __Util {
@@ -481,8 +480,8 @@ extension __Util {
             // Automatically Generated From Tools/GenerateUtilities.swift
             //===----------------------------------------------------------------------===//
             import Foundation
-            import XCTest
             public struct __Util {}
+            import XCTest
             extension __Util {
                 public static func displayWidth(of s: String, inEastAsian: Bool = false) -> Int {
                     return s.unicodeScalars.reduce(0) { $0 + displayWidth(of: $1, inEastAsian: inEastAsian) }
