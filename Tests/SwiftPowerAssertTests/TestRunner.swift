@@ -71,7 +71,7 @@ class TestRunner {
             fatalError(error.localizedDescription)
         }
 
-        try! __DisplayWidth.myself.write(toFile: utilitiesFilePath, atomically: true, encoding: .utf8)
+        try! __Util.source.write(toFile: utilitiesFilePath, atomically: true, encoding: .utf8)
         let main = """
             Tests().testMethod()
             """
