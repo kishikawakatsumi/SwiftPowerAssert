@@ -46,18 +46,3 @@ struct SourceLine {
     let lineNumber: Int
     let offset: Int
 }
-
-struct ExpressionMap {
-    let sourceRange: SourceRange
-    let expression: Expression
-}
-
-extension ExpressionMap: Hashable {
-    var hashValue: Int {
-        return sourceRange.hashValue
-    }
-
-    static func ==(lhs: ExpressionMap, rhs: ExpressionMap) -> Bool {
-        return lhs.sourceRange == rhs.sourceRange
-    }
-}
