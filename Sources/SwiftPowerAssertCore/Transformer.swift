@@ -356,131 +356,6 @@ class Transformer {
         return """
 
         do {
-            struct __Util {
-                static func equal(_ parameters: (Bool)) -> Bool {
-                    return parameters
-                }
-                static func equal(_ parameters: (condition: Bool, message: String)) -> Bool {
-                    return parameters.condition
-                }
-                static func `nil`(_ parameters: (Any?)) -> Bool {
-                    return parameters == nil
-                }
-                static func `nil`(_ parameters: (condition: Any?, message: String)) -> Bool {
-                    return parameters.condition == nil
-                }
-                static func equal<T>(_ parameters: (lhs: T, rhs: T)) -> Bool where T: Equatable {
-                    return parameters.lhs == parameters.rhs
-                }
-                static func equal<T>(_ parameters: (lhs: T, rhs: T, message: String)) -> Bool where T: Equatable {
-                    return equal((parameters.lhs, parameters.rhs))
-                }
-                static func equal<T>(_ parameters: (lhs: T, rhs: T, message: String, file: StaticString)) -> Bool where T: Equatable {
-                    return equal((parameters.lhs, parameters.rhs))
-                }
-                static func equal<T>(_ parameters: (lhs: T, rhs: T, message: String, file: StaticString, line: UInt)) -> Bool where T: Equatable {
-                    return equal((parameters.lhs, parameters.rhs))
-                }
-                static func equal<T>(_ parameters: (lhs: T?, rhs: T?)) -> Bool where T: Equatable {
-                    return parameters.lhs == parameters.rhs
-                }
-                static func equal<T>(_ parameters: (lhs: T?, rhs: T?, message: String)) -> Bool where T: Equatable {
-                    return equal((parameters.lhs, parameters.rhs))
-                }
-                static func equal<T>(_ parameters: (lhs: T?, rhs: T?, message: String, file: StaticString)) -> Bool where T: Equatable {
-                    return equal((parameters.lhs, parameters.rhs))
-                }
-                static func equal<T>(_ parameters: (lhs: T?, rhs: T?, message: String, file: StaticString, line: UInt)) -> Bool where T: Equatable {
-                    return equal((parameters.lhs, parameters.rhs))
-                }
-                static func equal<T>(_ parameters: (lhs: [T], rhs: [T])) -> Bool where T: Equatable {
-                    return parameters.lhs == parameters.rhs
-                }
-                static func equal<T>(_ parameters: (lhs: [T], rhs: [T], message: String)) -> Bool where T: Equatable {
-                    return equal((parameters.lhs, parameters.rhs))
-                }
-                static func equal<T>(_ parameters: (lhs: [T], rhs: [T], message: String, file: StaticString)) -> Bool where T: Equatable {
-                    return equal((parameters.lhs, parameters.rhs))
-                }
-                static func equal<T>(_ parameters: (lhs: [T], rhs: [T], message: String, file: StaticString, line: UInt)) -> Bool where T: Equatable {
-                    return equal((parameters.lhs, parameters.rhs))
-                }
-                static func equal<T>(_ parameters: (lhs: ArraySlice<T>, rhs: ArraySlice<T>)) -> Bool where T: Equatable {
-                    return parameters.lhs == parameters.rhs
-                }
-                static func equal<T>(_ parameters: (lhs: ArraySlice<T>, rhs: ArraySlice<T>, message: String)) -> Bool where T: Equatable {
-                    return equal((parameters.lhs, parameters.rhs))
-                }
-                static func equal<T>(_ parameters: (lhs: ArraySlice<T>, rhs: ArraySlice<T>, message: String, file: StaticString)) -> Bool where T: Equatable {
-                    return equal((parameters.lhs, parameters.rhs))
-                }
-                static func equal<T>(_ parameters: (lhs: ArraySlice<T>, rhs: ArraySlice<T>, message: String, file: StaticString, line: UInt)) -> Bool where T: Equatable {
-                    return equal((parameters.lhs, parameters.rhs))
-                }
-                static func equal<T>(_ parameters: (lhs: ContiguousArray<T>, rhs: ContiguousArray<T>)) -> Bool where T: Equatable {
-                    return parameters.lhs == parameters.rhs
-                }
-                static func equal<T>(_ parameters: (lhs: ContiguousArray<T>, rhs: ContiguousArray<T>, message: String)) -> Bool where T: Equatable {
-                    return equal((parameters.lhs, parameters.rhs))
-                }
-                static func equal<T>(_ parameters: (lhs: ContiguousArray<T>, rhs: ContiguousArray<T>, message: String, file: StaticString)) -> Bool where T: Equatable {
-                    return equal((parameters.lhs, parameters.rhs))
-                }
-                static func equal<T>(_ parameters: (lhs: ContiguousArray<T>, rhs: ContiguousArray<T>, message: String, file: StaticString, line: UInt)) -> Bool where T: Equatable {
-                    return equal((parameters.lhs, parameters.rhs))
-                }
-                static func equal<T, U>(_ parameters: (lhs: [T: U], rhs: [T: U])) -> Bool where U: Equatable {
-                    return parameters.lhs == parameters.rhs
-                }
-                static func equal<T, U>(_ parameters: (lhs: [T: U], rhs: [T: U], message: String)) -> Bool where U: Equatable {
-                    return equal((parameters.lhs, parameters.rhs))
-                }
-                static func equal<T, U>(_ parameters: (lhs: [T: U], rhs: [T: U], message: String, file: StaticString)) -> Bool where U: Equatable {
-                    return equal((parameters.lhs, parameters.rhs))
-                }
-                static func equal<T, U>(_ parameters: (lhs: [T: U], rhs: [T: U], message: String, file: StaticString, line: UInt)) -> Bool where U: Equatable {
-                    return equal((parameters.lhs, parameters.rhs))
-                }
-                static func greaterThan<T>(_ parameters: (lhs: T, rhs: T)) -> Bool where T: Comparable {
-                    return parameters.lhs > parameters.rhs
-                }
-                static func greaterThan<T>(_ parameters: (lhs: T, rhs: T, message: String)) -> Bool where T: Comparable {
-                    return greaterThan((parameters.lhs, parameters.rhs))
-                }
-                static func greaterThan<T>(_ parameters: (lhs: T, rhs: T, message: String, file: StaticString)) -> Bool where T: Comparable {
-                    return greaterThan((parameters.lhs, parameters.rhs))
-                }
-                static func greaterThan<T>(_ parameters: (lhs: T, rhs: T, message: String, file: StaticString, line: UInt)) -> Bool where T: Comparable {
-                    return greaterThan((parameters.lhs, parameters.rhs))
-                }
-                static func greaterThanOrEqual<T>(_ parameters: (lhs: T, rhs: T)) -> Bool where T: Comparable {
-                    return parameters.lhs >= parameters.rhs
-                }
-                static func greaterThanOrEqual<T>(_ parameters: (lhs: T, rhs: T, message: String)) -> Bool where T: Comparable {
-                    return greaterThanOrEqual((parameters.lhs, parameters.rhs))
-                }
-                static func greaterThanOrEqual<T>(_ parameters: (lhs: T, rhs: T, message: String, file: StaticString)) -> Bool where T: Comparable {
-                    return greaterThanOrEqual((parameters.lhs, parameters.rhs))
-                }
-                static func greaterThanOrEqual<T>(_ parameters: (lhs: T, rhs: T, message: String, file: StaticString, line: UInt)) -> Bool where T: Comparable {
-                    return greaterThanOrEqual((parameters.lhs, parameters.rhs))
-                }
-                static func value(_ value: String) -> String {
-                    return value
-                        .replacingOccurrences(of: "\\"", with: "\\\\\\"")
-                        .replacingOccurrences(of: "\\t", with: "\\\\t")
-                        .replacingOccurrences(of: "\\r", with: "\\\\r")
-                        .replacingOccurrences(of: "\\n", with: "\\\\n")
-                        .replacingOccurrences(of: "\\0", with: "\\\\0")
-                }
-                static func toString<T>(_ value: T?) -> String {
-                    switch value {
-                    case .some(let v) where v is String || v is Selector: return "\\"\\(__Util.value("\\(v)"))\\""
-                    case .some(let v): return "\\(v)".replacingOccurrences(of: "\\n", with: " ")
-                    case .none: return "nil"
-                    }
-                }
-            }
             var valueColumns = [Int: String]()
             let condition = { () -> Bool in
                 \(recordValues)
@@ -488,19 +363,11 @@ class Transformer {
             }()
             if \(verbose) || condition == \(failureCondition) {
                 var message = ""
-                func align(current: inout Int, column: Int, string: String) {
-                    while current < column - 1 {
-                        message += " "
-                        current += 1
-                    }
-                    message += string
-                    current += __DisplayWidth.of(string)
-                }
                 message += "\(assertion)\\n"
                 var values = Array(valueColumns).sorted { $0.0 < $1.0 }
                 var current = 0
                 for value in values {
-                    align(current: &current, column: value.0, string: "|")
+                    __Util.align(&message, current: &current, column: value.0, string: "|")
                 }
                 message += "\\n"
                 while !values.isEmpty {
@@ -508,10 +375,10 @@ class Transformer {
                     var index = 0
                     while index < values.count {
                         if index == values.count - 1 || ((values[index].0 + values[index].1.count < values[index + 1].0) && values[index].1.unicodeScalars.filter({ !$0.isASCII }).isEmpty) {
-                            align(current: &current, column: values[index].0, string: values[index].1)
+                            __Util.align(&message, current: &current, column: values[index].0, string: values[index].1)
                             values.remove(at: index)
                         } else {
-                            align(current: &current, column: values[index].0, string: "|")
+                            __Util.align(&message, current: &current, column: values[index].0, string: "|")
                             index += 1
                         }
                     }
@@ -590,7 +457,7 @@ class Transformer {
                     source += s
                     column += s.utf8.count
                     if column >= location.column {
-                        return __DisplayWidth.of(source)
+                        return __Util.displayWidth(of: source)
                     }
                 }
             } else {
@@ -601,7 +468,7 @@ class Transformer {
                 }
             }
         }
-        return __DisplayWidth.of(source)
+        return __Util.displayWidth(of: source)
     }
 }
 

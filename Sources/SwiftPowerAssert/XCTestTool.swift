@@ -123,7 +123,7 @@ struct XCTestTool {
                 let transformed = try processor.processFile(input: source, verbose: verbose)
                 do {
                     if let first = sources.first, first == source {
-                        try (transformed + "\n\n\n" + __DisplayWidth.myself).write(to: source, atomically: true, encoding: .utf8)
+                        try (transformed + "\n\n\n" + __Util.source).write(to: source, atomically: true, encoding: .utf8)
                     } else {
                         try transformed.write(to: source, atomically: true, encoding: .utf8)
                     }
