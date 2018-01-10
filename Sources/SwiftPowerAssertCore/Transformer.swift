@@ -65,6 +65,31 @@ class Transformer {
                         }
                     }
                 }
+            case .extension(let declaration):
+                declaration.members.forEach {
+                    switch $0 {
+                    case .declaration(let declaration):
+                        switch declaration {
+                        case .function(let declaration):
+                            declaration.body.forEach {
+                                switch $0 {
+                                case .expression(let expression):
+                                    traverse(expression) { (expression, _) in
+                                        if expression.rawValue == "call_expr", !expression.expressions.isEmpty {
+                                            if let assertion = Assertion.make(from: expression, in: sourceFile) {
+                                                assertions.append(assertion)
+                                            }
+                                        }
+                                    }
+                                default:
+                                    break
+                                }
+                            }
+                        default:
+                            break
+                        }
+                    }
+                }
             default:
                 break
             }

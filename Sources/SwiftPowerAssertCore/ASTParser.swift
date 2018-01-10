@@ -39,6 +39,8 @@ class ASTParser {
                 switch (token.type, token.value) {
                 case (.token, "class_decl"):
                     declarations.append(.class(parseClassDeclarationNode(node: node)))
+                case (.token, "extension_decl"):
+                    declarations.append(.extension(parseExtensionDeclarationNode(node: node)))
                 default:
                     break
                 }
@@ -87,6 +89,40 @@ class ASTParser {
         }
 
         return ClassDeclaration(accessLevel: accessLevel, name: name, typeInheritance: typeInheritance, members: members)
+    }
+
+    private func parseExtensionDeclarationNode(node: ASTNode<[ASTToken]>) -> ExtensionDeclaration {
+        let tokens = node.value
+
+        let name = tokens[2].value
+
+        let accessLevel: String
+        let attributes = parseKeyValueAttributes(tokens: tokens)
+        if let access = attributes["access"] {
+            accessLevel = access
+        } else {
+            accessLevel = "internal"
+        }
+
+        let typeInheritance = parseInherits(tokens: tokens)
+
+        var members = [ExtensionMember]()
+        for node in node.children {
+            let tokens = node.value
+            if isImplicit(tokens: tokens) {
+                continue
+            }
+            for token in tokens {
+                switch (token.type, token.value) {
+                case (.token, "func_decl"):
+                    members.append(.declaration(.function(parseFunctionDeclarationNode(node: node))))
+                default:
+                    break
+                }
+            }
+        }
+
+        return ExtensionDeclaration(accessLevel: accessLevel, name: name, typeInheritance: typeInheritance, members: members)
     }
 
     private func parseFunctionDeclarationNode(node: ASTNode<[ASTToken]>) -> FunctionDeclaration {
