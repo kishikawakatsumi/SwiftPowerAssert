@@ -210,6 +210,18 @@ class ASTTokenizer {
                 }
             }
         }
+        if !state.storage.isEmpty {
+            switch state.mode {
+            case .token, .value, .path:
+                state.tokens.append(ASTToken(type: .token, value: state.storage))
+            case .symbol:
+                state.tokens.append(ASTToken(type: .symbol, value: state.storage))
+            case .string:
+                state.tokens.append(ASTToken(type: .string, value: state.storage))
+            default:
+                break
+            }
+        }
         return state.tokens
     }
 }

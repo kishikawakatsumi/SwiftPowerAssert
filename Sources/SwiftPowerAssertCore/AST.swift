@@ -30,6 +30,7 @@ enum Statement {
 struct Expression {
     let identifier = UUID()
     let rawValue: String
+    // FIXME: Remove optionals
     let type: String!
     let rawLocation: String!
     let rawRange: String!
@@ -55,6 +56,7 @@ extension Expression: Hashable {
 
 enum Declaration {
     case `class`(ClassDeclaration)
+    case `extension`(ExtensionDeclaration)
     case function(FunctionDeclaration)
 }
 
@@ -66,6 +68,17 @@ struct ClassDeclaration {
 }
 
 enum ClassMember {
+    case declaration(Declaration)
+}
+
+struct ExtensionDeclaration {
+    let accessLevel: String
+    let name: String
+    let typeInheritance: String?
+    let members: [ExtensionMember]
+}
+
+enum ExtensionMember {
     case declaration(Declaration)
 }
 

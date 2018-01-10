@@ -364,7 +364,7 @@ class Tokenizer {
                 }
             case .stringEscape(let location):
                 switch character {
-                case "\"", "\\", "'", "t", "n", "r", "0":
+                case "\"", "\\", "'", "t", "n", "r", "0", "(": // '(' == string interpolation
                     state.mode = .string(location)
                     state.storage += "\\" + String(character)
                 case "u":
@@ -395,7 +395,7 @@ class Tokenizer {
                         state.mode = .multilineString(location, indent)
                         state.storage += "\\" + String(character)
                     }
-                case "\\", "'", "t", "n", "r", "0":
+                case "\\", "'", "t", "n", "r", "0", "(": // '(' == string interpolation
                     state.mode = .multilineString(location, indent)
                     state.storage += "\\" + String(character)
                 case "u":

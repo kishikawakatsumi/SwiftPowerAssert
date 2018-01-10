@@ -487,4 +487,65 @@ class XCTAssertTests: XCTestCase {
         let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
+
+    func testFunctionsInExtension() {
+        let source = """
+            import XCTest
+
+            struct Bar {
+                let foo: Foo
+                var val: Int
+            }
+
+            struct Foo {
+                var val: Int
+            }
+
+            class Tests: XCTestCase {}
+
+            extension Tests {
+                func testMethod() {
+                    let bar = Bar(foo: Foo(val: 2), val: 3)
+                    XCTAssert(bar.val == bar.foo.val)
+                    XCTAssertTrue(bar.val == bar.foo.val)
+                    XCTAssertFalse(bar.val != bar.foo.val)
+                }
+            }
+
+            extension Sequence where Iterator.Element == Int {
+                var sum: Int {
+                    return reduce(0, +)
+                }
+            }
+
+            """
+
+        let expected = """
+            XCTAssert(bar.val == bar.foo.val)
+                      |   |   |  |   |   |
+                      |   3   |  |   |   2
+                      |       |  |   Foo(val: 2)
+                      |       |  Bar(foo: main.Foo(val: 2), val: 3)
+                      |       false
+                      Bar(foo: main.Foo(val: 2), val: 3)
+            XCTAssertTrue(bar.val == bar.foo.val)
+                          |   |   |  |   |   |
+                          |   3   |  |   |   2
+                          |       |  |   Foo(val: 2)
+                          |       |  Bar(foo: main.Foo(val: 2), val: 3)
+                          |       false
+                          Bar(foo: main.Foo(val: 2), val: 3)
+            XCTAssertFalse(bar.val != bar.foo.val)
+                           |   |   |  |   |   |
+                           |   3   |  |   |   2
+                           |       |  |   Foo(val: 2)
+                           |       |  Bar(foo: main.Foo(val: 2), val: 3)
+                           |       true
+                           Bar(foo: main.Foo(val: 2), val: 3)
+
+            """
+
+        let result = TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
 }
