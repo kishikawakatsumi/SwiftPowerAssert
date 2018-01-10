@@ -38,11 +38,10 @@ data.enumerateLines { (line, stop) in
 
 var header = """
     //===----------------------------------------------------------------------===//
-    // Automatically Generated From Tools/GenerateUtilities.swift
+    // Automatically Generated From Tools/generate-utils
     //===----------------------------------------------------------------------===//
 
     import Foundation
-    import XCTest
 
     public struct __Util {}
 
@@ -566,7 +565,7 @@ let sourceCode = header + displayWidth + """
     extension __Util {
         public static var source: String {
             let source = \"\"\"
-    \((header + displayWidth + helperFunctions).split(separator: "\n").map { String(repeating: " ", count: 4 * 3) + $0 }.joined(separator: "\n"))
+    \((header + "import XCTest\n" + displayWidth + helperFunctions).split(separator: "\n").map { String(repeating: " ", count: 4 * 3) + $0 }.joined(separator: "\n"))
                 \"\"\"
             return source
         }

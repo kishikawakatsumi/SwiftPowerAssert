@@ -437,4 +437,54 @@ class XCTAssertTests: XCTestCase {
         let result = TestRunner().run(source: source)
         XCTAssertEqual(expected, result)
     }
+
+    func testThrowsFunction() {
+        let source = """
+            import XCTest
+
+            class YamlParser {
+                static func parse(_ string: String, env: [String: String]) throws -> [String] {
+                    return ["1", "2", "3"]
+                }
+            }
+
+            class Tests: XCTestCase {
+                func RuleWithLevelsMock(configuration: String) throws -> String {
+                    return ""
+                }
+
+                func testMethod() {
+                    let rules = ["rule"]
+                    let ruleConfiguration = "config"
+                    XCTAssertTrue(rules == [try RuleWithLevelsMock(configuration: ruleConfiguration)])
+
+                    XCTAssertEqual((try YamlParser.parse("", env: [:])).count, 0,
+                                   "Parsing empty YAML string should succeed")
+                    XCTAssertEqual(try YamlParser.parse("a: 1\\nb: 2", env: [:]).count, 2,
+                                   "Parsing valid YAML string should succeed")
+                }
+            }
+
+            """
+
+        let expected = """
+            XCTAssertTrue(rules == [try RuleWithLevelsMock(configuration: ruleConfiguration)])
+                          |     |  |    |                                 |
+                          |     |  [""] ""                                "config"
+                          |     false
+                          ["rule"]
+            XCTAssertEqual((try YamlParser.parse("", env: [:])).count, 0, "Parsing empty YAML string should succeed")
+                                           |     |        |     |      |
+                                           |     ""       [:]   3      0
+                                           ["1", "2", "3"]
+            XCTAssertEqual(try YamlParser.parse("a: 1\\nb: 2", env: [:]).count, 2, "Parsing valid YAML string should succeed")
+                                          |     |                  |    |      |
+                                          |     "a: 1\\nb: 2"       [:]  3      2
+                                          ["1", "2", "3"]
+
+            """
+
+        let result = TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
 }
