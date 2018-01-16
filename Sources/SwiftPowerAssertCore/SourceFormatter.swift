@@ -18,10 +18,10 @@
 
 import Foundation
 
-public class SourceFormatter {
-    public init() {}
+class SourceFormatter {
+    init() {}
 
-    public func format(source: String) -> String {
+    func format(source: String) -> String {
         return format(tokens: tokenize(source: source))
     }
 
@@ -522,7 +522,7 @@ class Tokenizer {
     }
 }
 
-public class Token {
+class Token {
     enum TokenType {
         case token
         case string
@@ -552,17 +552,17 @@ public class Token {
 }
 
 extension Token: Comparable {
-    public static func <(lhs: Token, rhs: Token) -> Bool {
+    static func <(lhs: Token, rhs: Token) -> Bool {
         return lhs.location < rhs.location
     }
 
-    public static func ==(lhs: Token, rhs: Token) -> Bool {
+    static func ==(lhs: Token, rhs: Token) -> Bool {
         return lhs.location == rhs.location
     }
 }
 
 extension Token: CustomStringConvertible {
-    public var description: String {
+    var description: String {
         switch self.type {
         case .token:
             return "\(location.line):\(location.column) \(value)"
