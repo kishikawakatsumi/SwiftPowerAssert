@@ -55,9 +55,28 @@ extension Expression: Hashable {
 }
 
 enum Declaration {
+    case `import`(ImportDeclaration)
+    case `struct`(StructDeclaration)
     case `class`(ClassDeclaration)
+    case `enum`(EnumDeclaration)
     case `extension`(ExtensionDeclaration)
     case function(FunctionDeclaration)
+}
+
+struct ImportDeclaration {
+    let importKind: String?
+    let importPath: String
+}
+
+struct StructDeclaration {
+    let accessLevel: String
+    let name: String
+    let typeInheritance: String?
+    let members: [StructMember]
+}
+
+enum StructMember {
+    case declaration(Declaration)
 }
 
 struct ClassDeclaration {
@@ -68,6 +87,17 @@ struct ClassDeclaration {
 }
 
 enum ClassMember {
+    case declaration(Declaration)
+}
+
+struct EnumDeclaration {
+    let accessLevel: String
+    let name: String
+    let typeInheritance: String?
+    let members: [EnumMember]
+}
+
+enum EnumMember {
     case declaration(Declaration)
 }
 
