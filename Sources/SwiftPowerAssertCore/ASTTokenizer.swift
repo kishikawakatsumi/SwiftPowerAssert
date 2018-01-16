@@ -44,7 +44,18 @@ class ASTTokenizer {
     }
 
     func tokenize(source: String) -> [ASTToken] {
-        let state = State(input: source)
+        var lines = [String]()
+        source.enumerateLines { (line, stop) in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("(inherited_conformance") ||  trimmed.hasPrefix("(normal_conformance") || trimmed.hasPrefix("(abstract_conformance") ||
+                trimmed.hasPrefix("(specialized_conformance") || trimmed.hasPrefix("(assoc_type") ||
+                trimmed.hasPrefix("(value req") || !trimmed.hasPrefix("(") {
+                return
+            }
+            lines.append(line)
+        }
+
+        let state = State(input: lines.joined(separator: "\n"))
         for character in state.input {
             switch state.mode {
             case .plain:
