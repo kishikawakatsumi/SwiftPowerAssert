@@ -189,11 +189,22 @@ func findFirst(_ expression: Expression, where closure: (_ expression: Expressio
     if closure(expression) {
         return expression
     }
-    for expression in expression.expressions {
-        if let found = findFirst(expression, where: closure) {
+    for child in expression.expressions {
+        if let found = findFirst(child, where: closure) {
             return found
         }
     }
     return nil
 }
 
+func findFirstParent(_ expression: Expression, where closure: (_ expression: Expression) -> Bool) -> Expression? {
+    for child in expression.expressions {
+        if closure(child) {
+            return expression
+        }
+        if let expression = findFirstParent(child, where: closure) {
+            return expression
+        }
+    }
+    return nil
+}

@@ -121,6 +121,7 @@ public class SourceFormatter {
             .replacingOccurrences(of: "\\r", with: "\\\\r")
             .replacingOccurrences(of: "\\n", with: "\\\\n")
             .replacingOccurrences(of: "\\0", with: "\\\\0")
+            .replacingOccurrences(of: "\\(", with: "\\\\(")
     }
 
     private func isSemicolonNeeded(line: Int, column: Int, expression: Expression) -> Bool {
@@ -293,6 +294,7 @@ class Tokenizer {
                         state.storage = ""
                     }
                     state.tokens.append(Token(type: .token, value: String(character), location: state.currentLocation))
+                    state.mode = .plain(SourceLocation(line: state.currentLocation.line, column: state.currentLocation.column + 1))
                 case " ", "\t":
                     state.storage.append(character)
                 default:
@@ -546,6 +548,16 @@ public class Token {
         self.type = type
         self.value = value
         self.location = location
+    }
+}
+
+extension Token: Comparable {
+    public static func <(lhs: Token, rhs: Token) -> Bool {
+        return lhs.location < rhs.location
+    }
+
+    public static func ==(lhs: Token, rhs: Token) -> Bool {
+        return lhs.location == rhs.location
     }
 }
 

@@ -21,6 +21,7 @@ import Foundation
 struct CapturedExpression {
     let text: String
     let column: Int
+    let source: String
     let expression: Expression
 }
 
