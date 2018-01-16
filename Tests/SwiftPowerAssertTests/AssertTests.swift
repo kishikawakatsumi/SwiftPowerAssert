@@ -1411,7 +1411,7 @@ class AssertTests: XCTestCase {
                 func testMethod() {
                     let bar = Bar(foo: Foo(val: 2), val: 3)
                     #if swift(>=3.2)
-                        assert(bar.val == bar.foo.val)
+                    assert(bar.val == bar.foo.val)
                     #endif
                 }
             }
@@ -1920,6 +1920,48 @@ class AssertTests: XCTestCase {
                    | | true
                    | false
                    false
+
+            """
+
+        let result = TestRunner().run(source: source)
+        XCTAssertEqual(expected, result)
+    }
+
+    func testHigerOrderFunction() {
+        let source = """
+            import XCTest
+
+            class Tests: XCTestCase {
+                func testA(_ i: Int) -> Int {
+                    return i + 1
+                }
+
+                func testB(_ i: Int) -> Int {
+                    return i + 1
+                }
+
+                func testMethod() {
+                    let array = [0, 1, 2]
+                    assert(array.map { testA($0) } == [3, 4])
+                    assert(array.map(testB) == [3, 4])
+                }
+            }
+            """
+
+        let expected = """
+            assert(array.map { testA($0) } == [3, 4])
+                   |     |                 |  ||  |
+                   |     [1, 2, 3]         |  |3  4
+                   [0, 1, 2]               |  [3, 4]
+                                           false
+            assert(array.map(testB) == [3, 4])
+                   |     |   |      |  ||  |
+                   |     |   |      |  |3  4
+                   |     |   |      |  [3, 4]
+                   |     |   |      false
+                   |     |   (Function)
+                   |     [1, 2, 3]
+                   [0, 1, 2]
 
             """
 
