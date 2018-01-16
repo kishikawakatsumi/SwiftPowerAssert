@@ -112,8 +112,19 @@ struct XCTestTool {
         defer {
             restoreOriginalSourceFiles(from: backupFiles)
         }
+
+        let bridgingHeaderPath: URL?
+        if let bridgingHeader = targetBuildSettings.settings["SWIFT_OBJC_BRIDGING_HEADER"] {
+            if bridgingHeader.hasPrefix("/") {
+                bridgingHeaderPath = URL(fileURLWithPath: bridgingHeader)
+            } else {
+                bridgingHeaderPath = URL(fileURLWithPath: targetBuildSettings.settings["SRCROOT"]!).appendingPathComponent(bridgingHeader)
+            }
+        } else {
+            bridgingHeaderPath = nil
+        }
         
-        let sources = targetBuildSettings.sources()
+        let sources = targetBuildSettings.sources().filter { $0.pathExtension == "swift" }
         for source in sources {
             var isDirectory: ObjCBool = false
             if FileManager.default.fileExists(atPath: source.path, isDirectory: &isDirectory) && !isDirectory.boolValue {
@@ -128,7 +139,7 @@ struct XCTestTool {
 
                 print("\tProcessing: \(source.lastPathComponent)")
                 let dependencies = sources.filter { $0 != source }
-                let processor = SwiftPowerAssert(buildOptions: swiftArguments, dependencies: dependencies)
+                let processor = SwiftPowerAssert(buildOptions: swiftArguments, dependencies: dependencies, bridgingHeader: bridgingHeaderPath)
                 let transformed = try processor.processFile(input: source, verbose: verbose)
                 do {
                     if let first = sources.first, first == source {
