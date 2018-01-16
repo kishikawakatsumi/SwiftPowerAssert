@@ -58,205 +58,62 @@ class ASTParser {
     }
 
     private func parseImportDeclarationNode(node: ASTNode<[ASTToken]>) -> ImportDeclaration {
-        var importPath: String!
-        for token in node.value {
-            switch token.type {
-            case .symbol:
-                importPath = token.value
-            default:
-                break
-            }
-        }
-
-        let attributes = parseKeyValueAttributes(tokens: node.value)
+        let tokens = node.value
+        let attributes = parseKeyValueAttributes(tokens: tokens)
         let importKind = attributes["kind"]
-
+        let importPath = parseSymbol(tokens: tokens)!
         return ImportDeclaration(importKind: importKind, importPath: importPath)
     }
 
     private func parseStructDeclarationNode(node: ASTNode<[ASTToken]>) -> StructDeclaration {
         let tokens = node.value
-
-        var name: String!
-        for token in tokens {
-            switch token.type {
-            case .string:
-                name = token.value
-            default:
-                break
-            }
-        }
-
-        let accessLevel: String
-        let attributes = parseKeyValueAttributes(tokens: tokens)
-        if let access = attributes["access"] {
-            accessLevel = access
-        } else {
-            accessLevel = "internal"
-        }
-
+        let name = parseString(tokens: tokens)!
+        let accessLevel = parseAccessLevel(tokens: tokens)
         let typeInheritance = parseInherits(tokens: tokens)
-
-        var members = [StructMember]()
-        for node in node.children {
-            let tokens = node.value
-            if isImplicit(tokens: tokens) {
-                continue
-            }
-            for token in tokens {
-                switch (token.type, token.value) {
-                case (.token, "func_decl"):
-                    members.append(.declaration(.function(parseFunctionDeclarationNode(node: node))))
-                default:
-                    break
-                }
-            }
-        }
-
+        let members: [StructMember] =
+            filter(node: node, matches: "func_decl")
+            .map { .declaration(.function(parseFunctionDeclarationNode(node: $0))) }
         return StructDeclaration(accessLevel: accessLevel, name: name, typeInheritance: typeInheritance, members: members)
     }
 
     private func parseClassDeclarationNode(node: ASTNode<[ASTToken]>) -> ClassDeclaration {
         let tokens = node.value
-
-        var name: String!
-        for token in tokens {
-            switch token.type {
-            case .string:
-                name = token.value
-            default:
-                break
-            }
-        }
-
-        let accessLevel: String
-        let attributes = parseKeyValueAttributes(tokens: tokens)
-        if let access = attributes["access"] {
-            accessLevel = access
-        } else {
-            accessLevel = "internal"
-        }
-
+        let name = parseString(tokens: tokens)!
+        let accessLevel = parseAccessLevel(tokens: tokens)
         let typeInheritance = parseInherits(tokens: tokens)
-
-        var members = [ClassMember]()
-        for node in node.children {
-            let tokens = node.value
-            if isImplicit(tokens: tokens) {
-                continue
-            }
-            for token in tokens {
-                switch (token.type, token.value) {
-                case (.token, "func_decl"):
-                    members.append(.declaration(.function(parseFunctionDeclarationNode(node: node))))
-                default:
-                    break
-                }
-            }
-        }
-
+        let members: [ClassMember] =
+            filter(node: node, matches: "func_decl")
+                .map { .declaration(.function(parseFunctionDeclarationNode(node: $0))) }
         return ClassDeclaration(accessLevel: accessLevel, name: name, typeInheritance: typeInheritance, members: members)
     }
 
     private func parseEnumDeclarationNode(node: ASTNode<[ASTToken]>) -> EnumDeclaration {
         let tokens = node.value
-
-        var name: String!
-        for token in tokens {
-            switch token.type {
-            case .string:
-                name = token.value
-            default:
-                break
-            }
-        }
-
-        let accessLevel: String
-        let attributes = parseKeyValueAttributes(tokens: tokens)
-        if let access = attributes["access"] {
-            accessLevel = access
-        } else {
-            accessLevel = "internal"
-        }
-
+        let name = parseString(tokens: tokens)!
+        let accessLevel = parseAccessLevel(tokens: tokens)
         let typeInheritance = parseInherits(tokens: tokens)
-
-        var members = [EnumMember]()
-        for node in node.children {
-            let tokens = node.value
-            for token in tokens {
-                if isImplicit(tokens: tokens) {
-                    continue
-                }
-                switch (token.type, token.value) {
-                case (.token, "func_decl"):
-                    members.append(.declaration(.function(parseFunctionDeclarationNode(node: node))))
-                default:
-                    break
-                }
-            }
-        }
-
+        let members: [EnumMember] =
+            filter(node: node, matches: "func_decl")
+                .map { .declaration(.function(parseFunctionDeclarationNode(node: $0))) }
         return EnumDeclaration(accessLevel: accessLevel, name: name, typeInheritance: typeInheritance, members: members)
     }
 
     private func parseExtensionDeclarationNode(node: ASTNode<[ASTToken]>) -> ExtensionDeclaration {
         let tokens = node.value
-
         let name = tokens[2].value
-
-        let accessLevel: String
-        let attributes = parseKeyValueAttributes(tokens: tokens)
-        if let access = attributes["access"] {
-            accessLevel = access
-        } else {
-            accessLevel = "internal"
-        }
-
+        let accessLevel = parseAccessLevel(tokens: tokens)
         let typeInheritance = parseInherits(tokens: tokens)
-
-        var members = [ExtensionMember]()
-        for node in node.children {
-            let tokens = node.value
-            if isImplicit(tokens: tokens) {
-                continue
-            }
-            for token in tokens {
-                switch (token.type, token.value) {
-                case (.token, "func_decl"):
-                    members.append(.declaration(.function(parseFunctionDeclarationNode(node: node))))
-                default:
-                    break
-                }
-            }
-        }
-
+        let members: [ExtensionMember] =
+            filter(node: node, matches: "func_decl")
+                .map { .declaration(.function(parseFunctionDeclarationNode(node: $0))) }
         return ExtensionDeclaration(accessLevel: accessLevel, name: name, typeInheritance: typeInheritance, members: members)
     }
 
     private func parseFunctionDeclarationNode(node: ASTNode<[ASTToken]>) -> FunctionDeclaration {
         let tokens = node.value
 
-        var name: String!
-
-        for token in tokens {
-            switch (token.type, token.value) {
-            case (.string, let value):
-                name = value
-            default:
-                break
-            }
-        }
-        if name == nil {
-            for token in tokens {
-                switch (token.type, token.value) {
-                case (.symbol, let value):
-                    name = value
-                default:
-                    break
-                }
-            }
-        }
+        let name = parseString(tokens: tokens) ?? parseSymbol(tokens: tokens)
+        let accessLevel = parseAccessLevel(tokens: tokens)
 
         var parameters = [Parameter]()
         var body = [Statement]()
@@ -273,15 +130,26 @@ class ASTParser {
             }
         }
 
-        let accessLevel: String
-        let attributes = parseKeyValueAttributes(tokens: tokens)
-        if let access = attributes["access"] {
-            accessLevel = access
-        } else {
-            accessLevel = "internal"
-        }
+        return FunctionDeclaration(accessLevel: accessLevel, name: name!, parameters: parameters, body: body)
+    }
 
-        return FunctionDeclaration(accessLevel: accessLevel, name: name, parameters: parameters, body: body)
+    private func filter(node: ASTNode<[ASTToken]>, matches value: String) -> [ASTNode<[ASTToken]>] {
+        var nodes = [ASTNode<[ASTToken]>]()
+        for node in node.children {
+            let tokens = node.value
+            if isImplicit(tokens: tokens) {
+                continue
+            }
+            for token in tokens {
+                switch (token.type, token.value) {
+                case (.token, value):
+                    nodes.append(node)
+                default:
+                    break
+                }
+            }
+        }
+        return nodes
     }
 
     private func parseExpressionNode(node: ASTNode<[ASTToken]>) -> Expression {
@@ -376,6 +244,35 @@ class ASTParser {
             }
         }
         return attributes
+    }
+
+    private func parseString(tokens: [ASTToken]) -> String? {
+        for token in tokens {
+            switch token.type {
+            case .string:
+                return token.value
+            default:
+                break
+            }
+        }
+        return nil
+    }
+
+    private func parseSymbol(tokens: [ASTToken]) -> String? {
+        for token in tokens {
+            switch token.type {
+            case .symbol:
+                return token.value
+            default:
+                break
+            }
+        }
+        return nil
+    }
+
+    private func parseAccessLevel(tokens: [ASTToken]) -> String {
+        let attributes = parseKeyValueAttributes(tokens: tokens)
+        return attributes["access"] ?? "internal"
     }
 
     private func parseInherits(tokens: [ASTToken]) -> String? {
