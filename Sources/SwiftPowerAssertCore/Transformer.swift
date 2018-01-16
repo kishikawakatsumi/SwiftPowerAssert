@@ -40,12 +40,62 @@ class Transformer {
         var assertions = OrderedSet<Assertion>()
         node.declarations.forEach {
             switch $0 {
-            case .class(let declaration) where declaration.typeInheritance == "XCTestCase":
+            case .struct(let declaration):
                 declaration.members.forEach {
                     switch $0 {
                     case .declaration(let declaration):
                         switch declaration {
-                        case .function(let declaration) where declaration.name.hasPrefix("test"):
+                        case .function(let declaration):
+                            declaration.body.forEach {
+                                switch $0 {
+                                case .expression(let expression):
+                                    traverse(expression) { (expression, _) in
+                                        if expression.rawValue == "call_expr", !expression.expressions.isEmpty {
+                                            if let assertion = Assertion.make(from: expression, in: sourceFile) {
+                                                assertions.append(assertion)
+                                            }
+                                        }
+                                    }
+                                default:
+                                    break
+                                }
+                            }
+                        default:
+                            break
+                        }
+                    }
+                }
+            case .class(let declaration):
+                declaration.members.forEach {
+                    switch $0 {
+                    case .declaration(let declaration):
+                        switch declaration {
+                        case .function(let declaration):
+                            declaration.body.forEach {
+                                switch $0 {
+                                case .expression(let expression):
+                                    traverse(expression) { (expression, _) in
+                                        if expression.rawValue == "call_expr", !expression.expressions.isEmpty {
+                                            if let assertion = Assertion.make(from: expression, in: sourceFile) {
+                                                assertions.append(assertion)
+                                            }
+                                        }
+                                    }
+                                default:
+                                    break
+                                }
+                            }
+                        default:
+                            break
+                        }
+                    }
+                }
+            case .enum(let declaration):
+                declaration.members.forEach {
+                    switch $0 {
+                    case .declaration(let declaration):
+                        switch declaration {
+                        case .function(let declaration):
                             declaration.body.forEach {
                                 switch $0 {
                                 case .expression(let expression):
@@ -146,3 +196,4 @@ func findFirst(_ expression: Expression, where closure: (_ expression: Expressio
     }
     return nil
 }
+
