@@ -22,10 +22,12 @@ import Basic
 public final class SwiftPowerAssert {
     private let buildOptions: [String]
     private let dependencies: [URL]
+    private let bridgingHeader: URL?
 
-    public init(buildOptions: [String], dependencies: [URL]) {
+    public init(buildOptions: [String], dependencies: [URL], bridgingHeader: URL? = nil) {
         self.buildOptions = buildOptions
         self.dependencies = dependencies
+        self.bridgingHeader = bridgingHeader
     }
 
     public func processFile(input: URL, verbose: Bool = false) throws -> String {
@@ -57,7 +59,13 @@ public final class SwiftPowerAssert {
             "-parse-as-library",
             "-dump-ast"
         ]
-        return arguments + buildOptions + ["-primary-file", source.path] + dependencies.map { $0.path }
+        let importObjcHeaderOption: [String]
+        if let bridgingHeader = bridgingHeader {
+            importObjcHeaderOption = ["-import-objc-header", bridgingHeader.path]
+        } else {
+            importObjcHeaderOption = []
+        }
+        return arguments + buildOptions + importObjcHeaderOption + ["-primary-file", source.path] + dependencies.map { $0.path }
     }
 
     private func dumpAST(arguments: [String]) throws -> String {
