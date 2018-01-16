@@ -28,10 +28,6 @@ struct Assertion {
     let sourceRange: SourceRange
     let lineNumber: UInt
 
-    var hasOperator: Bool {
-        return !binaryOperator.isEmpty
-    }
-
     fileprivate init(expression: Expression, numberOfArguments: Int, assertFunction: String, binaryOperator: String, _ sourceFile: SourceFile) {
         self.expression = expression
         self.numberOfArguments = numberOfArguments

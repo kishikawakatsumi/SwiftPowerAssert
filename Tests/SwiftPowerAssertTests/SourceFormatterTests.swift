@@ -17,11 +17,11 @@
 ////////////////////////////////////////////////////////////////////////////
 
 import XCTest
-@testable import SwiftPowerAssertCore
+import SwiftPowerAssertCore
 
 class SourceFormatterTests: XCTestCase {
     func testSourceTokenizer() {
-        let formatter = SwiftPowerAssertCore.SourceFormatter()
+        let formatter = SourceFormatter()
 
         XCTAssertEqual(formatter.format(source:
             "assert([one,  two,   \"three\"].index(of: zero) == two)"),
