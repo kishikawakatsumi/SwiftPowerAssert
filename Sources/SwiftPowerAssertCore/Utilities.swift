@@ -1,5 +1,5 @@
 //===----------------------------------------------------------------------===//
-// Automatically Generated From Tools/GenerateUtilities.swift
+// Automatically Generated From Tools/generate-utils
 //===----------------------------------------------------------------------===//
 
 import Foundation
@@ -477,7 +477,7 @@ extension __Util {
     public static var source: String {
         let source = """
             //===----------------------------------------------------------------------===//
-            // Automatically Generated From Tools/GenerateUtilities.swift
+            // Automatically Generated From Tools/generate-utils
             //===----------------------------------------------------------------------===//
             import Foundation
             public struct __Util {}
@@ -983,14 +983,14 @@ extension __Util {
                 var result = true
                 var originalMessage = ""
                 var values = [__Value]()
-                var errors = [Error]()
+                var errors = [Swift.Error]()
                 init(assertion: String, lineNumber: UInt, verbose: Bool = false, inUnitTests: Bool = false) {
                     self.assertion = assertion
                     self.lineNumber = lineNumber
                     self.verbose = verbose
                     self.inUnitTests = inUnitTests
                 }
-                func assertBoolean(_ expression: @autoclosure () throws -> (Bool), _ op: (Bool, Bool) -> Bool) -> __ValueRecorder {
+                func assertBoolean(_ expression: @autoclosure () throws -> Bool, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line, op: (Bool, Bool) -> Bool) -> __ValueRecorder {
                     do {
                         let value = try expression()
                         result = op(value, true)
@@ -999,382 +999,73 @@ extension __Util {
                     }
                     return self
                 }
-                func assertBoolean(_ expression: @autoclosure () throws -> (Bool, message: String), _ op: (Bool, Bool) -> Bool) -> __ValueRecorder {
+                func assertEquality<T>(_ expression1: @autoclosure () throws -> T, _ expression2: @autoclosure () throws -> T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line, op: (Bool, Bool) -> Bool) -> __ValueRecorder where T: Equatable {
                     do {
-                        let (value, message) = try expression()
-                        result = op(value, true)
-                        originalMessage = message
+                        let (lhs, rhs) = (try expression1(), try expression2())
+                        result = op(lhs == rhs, true)
                     } catch {
                         errors.append(error)
                     }
                     return self
                 }
-                func assertBoolean(_ expression: @autoclosure () throws -> (Bool, message: String, file: StaticString), _ op: (Bool, Bool) -> Bool) -> __ValueRecorder {
+                func assertEquality<T>(_ expression1: @autoclosure () throws -> T?, _ expression2: @autoclosure () throws -> T?, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line, op: (Bool, Bool) -> Bool) -> __ValueRecorder where T: Equatable {
                     do {
-                        let (value, message, _) = try expression()
-                        result = op(value, true)
-                        originalMessage = message
+                        let (lhs, rhs) = (try expression1(), try expression2())
+                        result = op(lhs == rhs, true)
                     } catch {
                         errors.append(error)
                     }
                     return self
                 }
-                func assertBoolean(_ expression: @autoclosure () throws -> (Bool, message: String, file: StaticString, line: UInt), _ op: (Bool, Bool) -> Bool) -> __ValueRecorder {
+                func assertEquality<T>(_ expression1: @autoclosure () throws -> [T], _ expression2: @autoclosure () throws -> [T], _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line, op: (Bool, Bool) -> Bool) -> __ValueRecorder where T: Equatable {
                     do {
-                        let (value, message, _, _) = try expression()
-                        result = op(value, true)
-                        originalMessage = message
+                        let (lhs, rhs) = (try expression1(), try expression2())
+                        result = op(lhs == rhs, true)
                     } catch {
                         errors.append(error)
                     }
                     return self
                 }
-                func assertEquality<T>(_ expression: @autoclosure () throws -> (T, T), _ op: (T, T) -> Bool) -> __ValueRecorder where T: Equatable {
+                func assertEquality<T>(_ expression1: @autoclosure () throws -> ArraySlice<T>, _ expression2: @autoclosure () throws -> ArraySlice<T>, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line, op: (Bool, Bool) -> Bool) -> __ValueRecorder where T: Equatable {
                     do {
-                        let (lhs, rhs) = try expression()
+                        let (lhs, rhs) = (try expression1(), try expression2())
+                        result = op(lhs == rhs, true)
+                    } catch {
+                        errors.append(error)
+                    }
+                    return self
+                }
+                func assertEquality<T>(_ expression1: @autoclosure () throws -> ContiguousArray<T>, _ expression2: @autoclosure () throws -> ContiguousArray<T>, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line, op: (Bool, Bool) -> Bool) -> __ValueRecorder where T: Equatable {
+                    do {
+                        let (lhs, rhs) = (try expression1(), try expression2())
+                        result = op(lhs == rhs, true)
+                    } catch {
+                        errors.append(error)
+                    }
+                    return self
+                }
+                func assertEquality<T, U>(_ expression1: @autoclosure () throws -> [T: U], _ expression2: @autoclosure () throws -> [T: U], _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line, op: (Bool, Bool) -> Bool) -> __ValueRecorder where U : Equatable {
+                    do {
+                        let (lhs, rhs) = (try expression1(), try expression2())
+                        result = op(lhs == rhs, true)
+                    } catch {
+                        errors.append(error)
+                    }
+                    return self
+                }
+                func assertComparable<T>(_ expression1: @autoclosure () throws -> T, _ expression2: @autoclosure () throws -> T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line, op: (T, T) -> Bool) -> __ValueRecorder where T: Comparable {
+                    do {
+                        let (lhs, rhs) = (try expression1(), try expression2())
                         result = op(lhs, rhs)
                     } catch {
                         errors.append(error)
                     }
                     return self
                 }
-                func assertEquality<T>(_ expression: @autoclosure () throws -> (T, T, message: String), _ op: (T, T) -> Bool) -> __ValueRecorder where T: Equatable {
-                    do {
-                        let (lhs, rhs, message) = try expression()
-                        result = op(lhs, rhs)
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertEquality<T>(_ expression: @autoclosure () throws -> (T, T, message: String, file: StaticString), _ op: (T, T) -> Bool) -> __ValueRecorder where T: Equatable {
-                    do {
-                        let (lhs, rhs, message, _) = try expression()
-                        result = op(lhs, rhs)
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertEquality<T>(_ expression: @autoclosure () throws -> (T, T, message: String, file: StaticString, line: UInt), _ op: (T, T) -> Bool) -> __ValueRecorder where T: Equatable {
-                    do {
-                        let (lhs, rhs, message, _, _) = try expression()
-                        result = op(lhs, rhs)
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertEquality<T>(_ expression: @autoclosure () throws -> (T?, T?), _ op: (T?, T?) -> Bool) -> __ValueRecorder where T: Equatable {
-                    do {
-                        let (lhs, rhs) = try expression()
-                        result = op(lhs, rhs)
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertEquality<T>(_ expression: @autoclosure () throws -> (T?, T?, message: String), _ op: (T?, T?) -> Bool) -> __ValueRecorder where T: Equatable {
-                    do {
-                        let (lhs, rhs, message) = try expression()
-                        result = op(lhs, rhs)
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertEquality<T>(_ expression: @autoclosure () throws -> (T?, T?, message: String, file: StaticString), _ op: (T?, T?) -> Bool) -> __ValueRecorder where T: Equatable {
-                    do {
-                        let (lhs, rhs, message, _) = try expression()
-                        result = op(lhs, rhs)
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertEquality<T>(_ expression: @autoclosure () throws -> (T?, T?, message: String, file: StaticString, line: UInt), _ op: (T?, T?) -> Bool) -> __ValueRecorder where T: Equatable {
-                    do {
-                        let (lhs, rhs, message, _, _) = try expression()
-                        result = op(lhs, rhs)
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertEquality<T>(_ expression: @autoclosure () throws -> ([T], [T]), _ op: ([T], [T]) -> Bool) -> __ValueRecorder where T: Equatable {
-                    do {
-                        let (lhs, rhs) = try expression()
-                        result = op(lhs, rhs)
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertEquality<T>(_ expression: @autoclosure () throws -> ([T], [T], message: String), _ op: ([T], [T]) -> Bool) -> __ValueRecorder where T: Equatable {
-                    do {
-                        let (lhs, rhs, message) = try expression()
-                        result = op(lhs, rhs)
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertEquality<T>(_ expression: @autoclosure () throws -> ([T], [T], message: String, file: StaticString), _ op: ([T], [T]) -> Bool) -> __ValueRecorder where T: Equatable {
-                    do {
-                        let (lhs, rhs, message, _) = try expression()
-                        result = op(lhs, rhs)
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertEquality<T>(_ expression: @autoclosure () throws -> ([T], [T], message: String, file: StaticString, line: UInt), _ op: ([T], [T]) -> Bool) -> __ValueRecorder where T: Equatable {
-                    do {
-                        let (lhs, rhs, message, _, _) = try expression()
-                        result = op(lhs, rhs)
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertEquality<T>(_ expression: @autoclosure () throws -> (ArraySlice<T>, ArraySlice<T>), _ op: (ArraySlice<T>, ArraySlice<T>) -> Bool) -> __ValueRecorder where T: Equatable {
-                    do {
-                        let (lhs, rhs) = try expression()
-                        result = op(lhs, rhs)
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertEquality<T>(_ expression: @autoclosure () throws -> (ArraySlice<T>, ArraySlice<T>, message: String), _ op: (ArraySlice<T>, ArraySlice<T>) -> Bool) -> __ValueRecorder where T: Equatable {
-                    do {
-                        let (lhs, rhs, message) = try expression()
-                        result = op(lhs, rhs)
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertEquality<T>(_ expression: @autoclosure () throws -> (ArraySlice<T>, ArraySlice<T>, message: String, file: StaticString), _ op: (ArraySlice<T>, ArraySlice<T>) -> Bool) -> __ValueRecorder where T: Equatable {
-                    do {
-                        let (lhs, rhs, message, _) = try expression()
-                        result = op(lhs, rhs)
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertEquality<T>(_ expression: @autoclosure () throws -> (ArraySlice<T>, ArraySlice<T>, message: String, file: StaticString, line: UInt), _ op: (ArraySlice<T>, ArraySlice<T>) -> Bool) -> __ValueRecorder where T: Equatable {
-                    do {
-                        let (lhs, rhs, message, _, _) = try expression()
-                        result = op(lhs, rhs)
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertEquality<T>(_ expression: @autoclosure () throws -> (ContiguousArray<T>, ContiguousArray<T>), _ op: (ContiguousArray<T>, ContiguousArray<T>) -> Bool) -> __ValueRecorder where T: Equatable {
-                    do {
-                        let (lhs, rhs) = try expression()
-                        result = op(lhs, rhs)
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertEquality<T>(_ expression: @autoclosure () throws -> (ContiguousArray<T>, ContiguousArray<T>, message: String), _ op: (ContiguousArray<T>, ContiguousArray<T>) -> Bool) -> __ValueRecorder where T: Equatable {
-                    do {
-                        let (lhs, rhs, message) = try expression()
-                        result = op(lhs, rhs)
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertEquality<T>(_ expression: @autoclosure () throws -> (ContiguousArray<T>, ContiguousArray<T>, message: String, file: StaticString), _ op: (ContiguousArray<T>, ContiguousArray<T>) -> Bool) -> __ValueRecorder where T: Equatable {
-                    do {
-                        let (lhs, rhs, message, _) = try expression()
-                        result = op(lhs, rhs)
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertEquality<T>(_ expression: @autoclosure () throws -> (ContiguousArray<T>, ContiguousArray<T>, message: String, file: StaticString, line: UInt), _ op: (ContiguousArray<T>, ContiguousArray<T>) -> Bool) -> __ValueRecorder where T: Equatable {
-                    do {
-                        let (lhs, rhs, message, _, _) = try expression()
-                        result = op(lhs, rhs)
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertEquality<T, U>(_ expression: @autoclosure () throws -> ([T: U], [T: U]), _ op: ([T: U], [T: U]) -> Bool) -> __ValueRecorder where U : Equatable {
-                    do {
-                        let (lhs, rhs) = try expression()
-                        result = op(lhs, rhs)
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertEquality<T, U>(_ expression: @autoclosure () throws -> ([T: U], [T: U], message: String), _ op: ([T: U], [T: U]) -> Bool) -> __ValueRecorder where U : Equatable {
-                    do {
-                        let (lhs, rhs, message) = try expression()
-                        result = op(lhs, rhs)
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertEquality<T, U>(_ expression: @autoclosure () throws -> ([T: U], [T: U], message: String, file: StaticString), _ op: ([T: U], [T: U]) -> Bool) -> __ValueRecorder where U : Equatable {
-                    do {
-                        let (lhs, rhs, message, _) = try expression()
-                        result = op(lhs, rhs)
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertEquality<T, U>(_ expression: @autoclosure () throws -> ([T: U], [T: U], message: String, file: StaticString, line: UInt), _ op: ([T: U], [T: U]) -> Bool) -> __ValueRecorder where U : Equatable {
-                    do {
-                        let (lhs, rhs, message, _, _) = try expression()
-                        result = op(lhs, rhs)
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertComparable<T>(_ expression: @autoclosure () throws -> (T, T), _ op: (T, T) -> Bool) -> __ValueRecorder where T: Comparable {
-                    do {
-                        let (lhs, rhs) = try expression()
-                        result = op(lhs, rhs)
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertComparable<T>(_ expression: @autoclosure () throws -> (T, T, message: String), _ op: (T, T) -> Bool) -> __ValueRecorder where T: Comparable {
-                    do {
-                        let (lhs, rhs, message) = try expression()
-                        result = op(lhs, rhs)
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertComparable<T>(_ expression: @autoclosure () throws -> (T, T, message: String, file: StaticString), _ op: (T, T) -> Bool) -> __ValueRecorder where T: Comparable {
-                    do {
-                        let (lhs, rhs, message, _) = try expression()
-                        result = op(lhs, rhs)
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertComparable<T>(_ expression: @autoclosure () throws -> (T, T, message: String, file: StaticString, line: UInt), _ op: (T, T) -> Bool) -> __ValueRecorder where T: Comparable {
-                    do {
-                        let (lhs, rhs, message, _, _) = try expression()
-                        result = op(lhs, rhs)
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertNil(_ expression: @autoclosure () throws -> (Any?)) -> __ValueRecorder {
+                func assertNil(_ expression: @autoclosure () throws -> Any?, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line, op: (Bool, Bool) -> Bool) -> __ValueRecorder {
                     do {
                         let value = try expression()
-                        result = value == nil
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertNil(_ expression: @autoclosure () throws -> (Any?, message: String)) -> __ValueRecorder {
-                    do {
-                        let (value, message) = try expression()
-                        result = value == nil
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertNil(_ expression: @autoclosure () throws -> (Any?, message: String, file: StaticString)) -> __ValueRecorder {
-                    do {
-                        let (value, message, _) = try expression()
-                        result = value == nil
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertNil(_ expression: @autoclosure () throws -> (Any?, message: String, file: StaticString, line: UInt)) -> __ValueRecorder {
-                    do {
-                        let (value, message, _, _) = try expression()
-                        result = value == nil
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertNotNil(_ expression: @autoclosure () throws -> (Any?)) -> __ValueRecorder {
-                    do {
-                        let value = try expression()
-                        result = value != nil
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertNotNil(_ expression: @autoclosure () throws -> (Any?, message: String)) -> __ValueRecorder {
-                    do {
-                        let (value, message) = try expression()
-                        result = value != nil
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertNotNil(_ expression: @autoclosure () throws -> (Any?, message: String, file: StaticString)) -> __ValueRecorder {
-                    do {
-                        let (value, message, _) = try expression()
-                        result = value != nil
-                        originalMessage = message
-                    } catch {
-                        errors.append(error)
-                    }
-                    return self
-                }
-                func assertNotNil(_ expression: @autoclosure () throws -> (Any?, message: String, file: StaticString, line: UInt)) -> __ValueRecorder {
-                    do {
-                        let (value, message, _, _) = try expression()
-                        result = value != nil
-                        originalMessage = message
+                        result = op(value == nil, true)
                     } catch {
                         errors.append(error)
                     }

@@ -66,9 +66,9 @@ struct Assertion {
         case "XCTest.(file).XCTAssertLessThan(_:_:_:file:line:)":
             return Assertion(expression: expression, numberOfArguments: 2, assertFunction: "assertComparable", binaryOperator: "<", sourceFile)
         case "XCTest.(file).XCTAssertNil(_:_:file:line:)":
-            return Assertion(expression: expression, numberOfArguments: 1, assertFunction: "assertNil", binaryOperator: "", sourceFile)
+            return Assertion(expression: expression, numberOfArguments: 1, assertFunction: "assertNil", binaryOperator: "==", sourceFile)
          case "XCTest.(file).XCTAssertNotNil(_:_:file:line:)":
-            return Assertion(expression: expression, numberOfArguments: 1, assertFunction: "assertNotNil", binaryOperator: "", sourceFile)
+            return Assertion(expression: expression, numberOfArguments: 1, assertFunction: "assertNil", binaryOperator: "!=", sourceFile)
         default:
             return nil
         }
@@ -76,16 +76,51 @@ struct Assertion {
 
     func assertion() -> String {
         let source = sourceFile[expression.range]
-        let tuple = expression.expressions[1]
+        let tupleExpression = findFirstParent(expression) { return $0.rawValue == "autoclosure_expr" }!
         let formatter = SourceFormatter()
-        return formatter.escaped(tokens: formatter.tokenize(source: source), withHint: tuple)
+        return formatter.escaped(tokens: formatter.tokenize(source: source), withHint: tupleExpression)
     }
 
-    func condition() -> String {
-        let tuple = expression.expressions[1]
-        let source = sourceFile[tuple.range]
-        let formatter = SourceFormatter()
-        return formatter.format(tokens: formatter.tokenize(source: source), withHint: tuple)
+    func argumentExpressions() -> [Expression] {
+        let tupleExpression = findFirstParent(expression) { return $0.rawValue == "autoclosure_expr" }!
+        return Array(tupleExpression.expressions.prefix(numberOfArguments))
+    }
+
+    func argumentSources() -> [String] {
+        let tupleExpression = findFirstParent(expression) { return $0.rawValue == "autoclosure_expr" }!
+        let argumentExpressions = tupleExpression.expressions
+        var sources = [String]()
+        for (index, expression) in argumentExpressions.enumerated() {
+            var widestRange = expression.range!
+            traverse(expression) { (expression, stop) in
+                if let range = expression.range  {
+                    if range.start < widestRange.start {
+                        widestRange = SourceRange(start: range.start, end: widestRange.end)
+                    }
+                    if range.end > widestRange.end {
+                        widestRange = SourceRange(start: widestRange.start, end: range.end)
+                    }
+                }
+            }
+            if index + 1 < argumentExpressions.count {
+                let source = sourceFile[SourceRange(start: widestRange.start, end: argumentExpressions[index + 1].range.start)]
+                for (index, character) in source.reversed().enumerated() {
+                    if character == "," {
+                        sources.append(String(source[source.startIndex..<source.index(source.endIndex, offsetBy: -(index + 1))]))
+                        break
+                    }
+                }
+            } else {
+                let source = sourceFile[SourceRange(start: widestRange.start, end: tupleExpression.range.end)]
+                for (index, character) in source.reversed().enumerated() {
+                    if character == ")" {
+                        sources.append(String(source[source.startIndex..<source.index(source.endIndex, offsetBy: -(index + 1))]))
+                        break
+                    }
+                }
+            }
+        }
+        return Array(sources.prefix(numberOfArguments))
     }
 }
 

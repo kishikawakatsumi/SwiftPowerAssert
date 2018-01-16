@@ -22,45 +22,45 @@ import Basic
 class SourceCompletion {
     let sourceFile: SourceFile
     let expression: Expression
-    let numberOfArguments: Int
 
-    let parenExpression: Expression
-    let sentinelExpression: Expression?
+    let tupleExpression: Expression
     let boundaries: [SourceLocation]
 
-    init(expression: Expression, numberOfArguments: Int, sourceFile: SourceFile) {
+    init(expression: Expression, sourceFile: SourceFile) {
         self.expression = expression
-        self.numberOfArguments = numberOfArguments
         self.sourceFile = sourceFile
 
-        parenExpression = findFirst(expression) { $0.rawValue == "tuple_shuffle_expr" } ?? findFirst(expression) { $0.rawValue == "paren_expr" }!
-        sentinelExpression = SourceCompletion.findSentinelExpression(expression: parenExpression, numberOfArguments)
+        tupleExpression = findFirstParent(expression) { $0.rawValue == "autoclosure_expr" }!
 
         var boundaries = OrderedSet<SourceLocation>()
         traverse(expression) { (expression, stop) in
+            // FIXME: Needs introspection
+            guard let range = expression.range else {
+                return
+            }
             if expression.rawValue == "declref_expr" {
-                boundaries.append(expression.range.start)
+                boundaries.append(range.start)
             }
             if expression.rawValue == "call_expr" && !expression.isImplicit {
-                boundaries.append(expression.range.start)
-                boundaries.append(expression.range.end)
+                boundaries.append(range.start)
+                boundaries.append(range.end)
             }
             if expression.rawValue == "member_ref_expr" {
-                boundaries.append(SourceLocation(line: expression.range.end.line, column: expression.range.end.column - 2 /* foo.b -> foo */))
+                boundaries.append(SourceLocation(line: range.end.line, column: range.end.column - 2 /* foo.b -> foo */))
             }
             if expression.rawValue == "string_literal_expr" {
-                boundaries.append(expression.range.start)
+                boundaries.append(range.start)
             }
             if expression.rawValue == "paren_expr" {
-                boundaries.append(SourceLocation(line: expression.range.end.line, column: expression.range.end.column - 1 /* ...foo) -> foo */))
+                boundaries.append(SourceLocation(line: range.end.line, column: range.end.column - 1 /* ...foo) -> foo */))
             }
         }
-        let source = sourceFile[parenExpression.range]
+        let source = sourceFile[expression.range]
 
         let formatter = SourceFormatter()
         let tokens = formatter.tokenize(source: source)
-        let line = parenExpression.range.start.line
-        let column = parenExpression.range.start.column
+        let line = expression.range.start.line
+        let column = expression.range.start.column
 
         for token in tokens {
             let offset = token.location.line == 0 ? column : 0
@@ -88,15 +88,15 @@ class SourceCompletion {
         self.boundaries = boundaries.sorted()
     }
 
-    func completeSource(expression: Expression) -> String {
-        var nextBoundary = parenExpression.range.end
+    func completeSource(range: SourceRange) -> String {
+        var nextBoundary = tupleExpression.range.end
         for boundary in boundaries {
-            if expression.range.end <= boundary {
+            if range.end <= boundary {
                 nextBoundary = boundary
                 break
             }
         }
-        let range = SourceRange(start: expression.range.start, end: SourceLocation(line: nextBoundary.line, column: nextBoundary.column))
+        let range = SourceRange(start: range.start, end: SourceLocation(line: nextBoundary.line, column: nextBoundary.column))
         return sourceFile[range]
     }
 
@@ -141,23 +141,5 @@ class SourceCompletion {
         }
 
         return String(sourceText[startIndex..<endIndex])!
-    }
-
-    private static func findSentinelExpression(expression: Expression, _ numberOfParameters: Int) -> Expression? {
-        var sentinel: Expression?
-        var sentinelParent: Expression?
-        var current: Expression?
-        traverse(expression) { (childExpression, stop) in
-            if childExpression.rawValue == "autoclosure_expr" {
-                sentinelParent = current
-                stop = true
-                return
-            }
-            current = childExpression
-        }
-        if let sentinelParent = sentinelParent, numberOfParameters < sentinelParent.expressions.count {
-            sentinel = sentinelParent.expressions[numberOfParameters]
-        }
-        return sentinel
     }
 }
