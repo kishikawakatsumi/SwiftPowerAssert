@@ -1,0 +1,161 @@
+#!/usr/bin/env xcrun swift
+
+import Foundation
+
+struct Project: Decodable {
+    let repository: String
+    let url: URL
+    let path: String
+    let branch: String
+    let maintainer: String
+    let compatibility: [Compatibility]
+    let platforms: [String]
+    let actions: [Action]
+}
+
+struct Compatibility: Decodable {
+    let version: String
+    let commit: String
+}
+
+struct Action: Decodable {
+    let action: String
+    let project: String?
+    let target: String?
+    let workspace: String?
+    let scheme: String?
+    let destination: String?
+    let configuration: String?
+}
+
+let data = try! Data(contentsOf: URL(string: "https://raw.githubusercontent.com/apple/swift-source-compat-suite/master/projects.json")!)
+let projects = try JSONDecoder().decode([Project].self, from: data)
+    .filter { $0.repository == "Git" }
+    .filter { return $0.actions.contains { $0.action.hasPrefix("Test") } }
+
+var script = """
+#!/usr/bin/env sh
+set -ex
+export NSUnbufferedIO=YES
+
+git clone https://github.com/kishikawakatsumi/SwiftPowerAssert.git tool
+cd tool
+swift build -c release
+cd ..
+
+rm -rf project
+
+
+"""
+var count = 0
+
+for project in projects {
+    script += """
+    git clone --recursive \(project.url.absoluteString) project
+    cd project
+
+    """
+    for _ in project.compatibility {
+        for action in project.actions {
+            switch action.action {
+            case "TestSwiftPackage":
+                let configurationOption: String
+                if let configuration = action.configuration {
+                    configurationOption = "-c \(configuration)"
+                } else {
+                    configurationOption = ""
+                }
+                count += 1
+                script += """
+                ../tool/.build/release/swift-power-assert --verbose test -Xswift test \(configurationOption)
+
+                """
+            case "TestXcodeWorkspaceScheme":
+                guard let workspace = action.workspace, let scheme = action.scheme else {
+                    break
+                }
+                let configurationOption: String
+                if let configuration = action.configuration {
+                    configurationOption = "-configuration \"\(configuration)\""
+                } else {
+                    configurationOption = ""
+                }
+                let destinationOption: String
+                if let destination = action.destination {
+                    if destination.contains("tvOS Simulator") {
+                        destinationOption = "-destination \"\(destination),OS=10.2\""
+                    } else {
+                        destinationOption = "-destination \"\(destination)\""
+                    }
+                } else {
+                    destinationOption = ""
+                }
+                count += 1
+                script += """
+                ../tool/.build/release/swift-power-assert --verbose xctest -Xxcodebuild test -workspace "\(workspace)" -scheme "\(scheme)" \(configurationOption) \(destinationOption)
+
+                """
+            case "TestXcodeProjectScheme":
+                guard let xcproject = action.project, let scheme = action.scheme else {
+                    break
+                }
+                let configurationOption: String
+                if let configuration = action.configuration {
+                    configurationOption = "-configuration \"\(configuration)\""
+                } else {
+                    configurationOption = ""
+                }
+                let destinationOption: String
+                if let destination = action.destination {
+                    if destination.contains("tvOS Simulator") {
+                        destinationOption = "-destination \"\(destination),OS=10.2\""
+                    } else {
+                        destinationOption = "-destination \"\(destination)\""
+                    }
+                } else {
+                    destinationOption = ""
+                }
+                count += 1
+                script += """
+                ../tool/.build/release/swift-power-assert --verbose xctest -Xxcodebuild test -project "\(xcproject)" -scheme "\(scheme)" \(configurationOption) \(destinationOption)
+
+                """
+            case "TestXcodeProjectTarget":
+                guard let xcproject = action.project, let target = action.target else {
+                    break
+                }
+                let configurationOption: String
+                if let configuration = action.configuration {
+                    configurationOption = "-configuration \"\(configuration)\""
+                } else {
+                    configurationOption = ""
+                }
+                let destinationOption: String
+                if let destination = action.destination {
+                    if destination.contains("tvOS Simulator") {
+                        destinationOption = "-destination \"\(destination),OS=10.2\""
+                    } else {
+                        destinationOption = "-destination \"\(destination)\""
+                    }
+                } else {
+                    destinationOption = ""
+                }
+                count += 1
+                script += """
+                ../tool/.build/release/swift-power-assert --verbose xctest -Xxcodebuild test -project "\(xcproject)" -target "\(target)" \(configurationOption) \(destinationOption)
+
+                """
+            default:
+                break
+            }
+        }
+    }
+    script += """
+    cd ..
+    rm -rf project
+
+
+    """
+}
+
+try! script.write(to: URL(fileURLWithPath: "run.sh"), atomically: true, encoding: .utf8)
