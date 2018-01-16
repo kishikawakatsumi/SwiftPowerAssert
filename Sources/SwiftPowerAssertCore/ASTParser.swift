@@ -47,6 +47,8 @@ class ASTParser {
                     declarations.append(.enum(parseEnumDeclarationNode(node: node)))
                 case (.token, "extension_decl"):
                     declarations.append(.extension(parseExtensionDeclarationNode(node: node)))
+                case (.token, "func_decl"):
+                    declarations.append(.function(parseFunctionDeclarationNode(node: node)))
                 default:
                     break
                 }
@@ -381,7 +383,7 @@ class ASTParser {
             switch (token.type, token.value) {
             case (.token, ":"):
                 if case .token = tokens[index - 1].type, tokens[index - 1].value == "inherits" {
-                    return tokens[index + 1].value
+                    return tokens[index + 1..<tokens.count].map { $0.value }.joined(separator: " ")
                 }
             default:
                 break

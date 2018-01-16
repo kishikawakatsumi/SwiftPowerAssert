@@ -82,19 +82,8 @@ public final class SwiftPowerAssert {
     }
 
     private func tokenize(rawAST: String) -> [ASTToken] {
-        var lines = [String]()
-        rawAST.enumerateLines { (line, stop) in
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("(inherited_conformance") ||  trimmed.hasPrefix("(normal_conformance") || trimmed.hasPrefix("(abstract_conformance") ||
-                trimmed.hasPrefix("(specialized_conformance") || trimmed.hasPrefix("(assoc_type") ||
-                trimmed.hasPrefix("(value req") || !trimmed.hasPrefix("(") {
-                return
-            }
-            lines.append(line)
-        }
-
         let tokenizer = ASTTokenizer()
-        return tokenizer.tokenize(source: lines.joined(separator: "\n"))
+        return tokenizer.tokenize(source: rawAST)
     }
 
     private func lex(tokens: [ASTToken]) -> ASTNode<[ASTToken]> {

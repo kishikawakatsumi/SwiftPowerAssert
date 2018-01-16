@@ -21,46 +21,7 @@ import Basic
 import SwiftPowerAssertCore
 
 class TestRunner {
-    private lazy var temporaryDirectory = {
-        return try! TemporaryDirectory(prefix: "com.kishikawakatsumi.swift-power-assert", removeTreeOnDeinit: true)
-    }()
-    private lazy var temporaryFile = {
-        return try! TemporaryFile(dir: temporaryDirectory.path, prefix: "Tests", suffix: ".swift").path
-    }()
-    private lazy var sourceFilePath = {
-        return temporaryFile.asString
-    }()
-    private lazy var utilitiesFilePath = {
-        return temporaryDirectory.path.appending(component: "Utilities.swift").asString
-    }()
-    private lazy var mainFilePath = {
-        return temporaryDirectory.path.appending(component: "main.swift").asString
-    }()
-    private lazy var executablePath = {
-        return sourceFilePath + ".o"
-    }()
-    private lazy var sdk = {
-        return try! SDK.macosx.path()
-    }()
-    private var targetTriple: String {
-        return "x86_64-apple-macosx10.10"
-    }
-    private lazy var options: [String] = {
-        let targetTriple = "x86_64-apple-macosx10.10"
-        let buildDirectory = temporaryDirectory.path.asString
-        return [
-            "-sdk",
-            sdk,
-            "-target",
-            targetTriple,
-            "-F",
-            sdk + "/../../../Developer/Library/Frameworks",
-            "-F",
-            buildDirectory,
-            "-I",
-            buildDirectory
-        ]
-    }()
+    let env = TestEnvironments()
 
     func run(source: String) -> String {
         prepare(source: source)
@@ -73,48 +34,26 @@ class TestRunner {
     }
 
     private func prepare(source: String) {
-        try! source.write(toFile: sourceFilePath, atomically: true, encoding: .utf8)
-        let processor = SwiftPowerAssert(buildOptions: options, dependencies: [])
+        try! source.write(toFile: env.sourceFilePath, atomically: true, encoding: .utf8)
+        let processor = SwiftPowerAssert(buildOptions: env.parseOptions, dependencies: [])
         do {
-            let transformed = try processor.processFile(input: URL(fileURLWithPath: sourceFilePath))
-            try! transformed.write(toFile: sourceFilePath, atomically: true, encoding: .utf8)
+            let transformed = try processor.processFile(input: URL(fileURLWithPath: env.sourceFilePath))
+            try! transformed.write(toFile: env.sourceFilePath, atomically: true, encoding: .utf8)
         } catch SwiftPowerAssertError.buildFailed(let description) {
             fatalError(description)
         } catch {
             fatalError(error.localizedDescription)
         }
 
-        try! __Util.source.write(toFile: utilitiesFilePath, atomically: true, encoding: .utf8)
+        try! __Util.source.write(toFile: env.utilitiesFilePath, atomically: true, encoding: .utf8)
         let main = """
             Tests().testMethod()
             """
-        try! main.write(toFile: mainFilePath, atomically: true, encoding: .utf8)
+        try! main.write(toFile: env.mainFilePath, atomically: true, encoding: .utf8)
     }
 
     private func compile() {
-        let arguments = [
-            "/usr/bin/xcrun",
-            "swiftc",
-            "-O",
-            "-whole-module-optimization",
-            sourceFilePath,
-            utilitiesFilePath,
-            mainFilePath,
-            "-o",
-            executablePath,
-            "-target",
-            targetTriple,
-            "-sdk",
-            sdk,
-            "-F",
-            "\(sdk)/../../../Developer/Library/Frameworks",
-            "-Xlinker",
-            "-rpath",
-            "-Xlinker",
-            "\(sdk)/../../../Developer/Library/Frameworks",
-        ]
-
-        let process = Process(arguments: arguments)
+        let process = Process(arguments: env.execOptions)
         try! process.launch()
         let result = try! process.waitUntilExit()
         if case .terminated(let code) = result.exitStatus, code != 0 {
@@ -123,7 +62,7 @@ class TestRunner {
     }
 
     private func execute() -> String {
-        let process = Process(arguments: [executablePath])
+        let process = Process(arguments: [env.executablePath])
         try! process.launch()
 
         let result = try! process.waitUntilExit()
