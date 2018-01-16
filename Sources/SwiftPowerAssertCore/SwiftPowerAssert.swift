@@ -85,7 +85,7 @@ public final class SwiftPowerAssert {
         var lines = [String]()
         rawAST.enumerateLines { (line, stop) in
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("(normal_conformance") || trimmed.hasPrefix("(abstract_conformance") ||
+            if trimmed.hasPrefix("(inherited_conformance") ||  trimmed.hasPrefix("(normal_conformance") || trimmed.hasPrefix("(abstract_conformance") ||
                 trimmed.hasPrefix("(specialized_conformance") || trimmed.hasPrefix("(assoc_type") ||
                 trimmed.hasPrefix("(value req") || !trimmed.hasPrefix("(") {
                 return
