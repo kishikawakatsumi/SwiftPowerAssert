@@ -75,46 +75,14 @@ struct ArgumentCaptor {
                         return
                     }
 
-                    // FIXME
-                    var containsThrowsFunction = false
-                    traverse(part) { (expression, _) in
-                        guard !containsThrowsFunction else { return }
-                        containsThrowsFunction = expression.rawValue == "call_expr" && expression.throwsModifier == "throws"
-                    }
-                    var partTokens = formatter.tokenize(source: source)
-                    if containsThrowsFunction {
-                        var iterator = partTokens.enumerated().makeIterator()
-                        var tryOperatorIndices = [Int]()
-                        while let (index, token) = iterator.next() {
-                            switch token.type {
-                            case .token where token.value == "try":
-                                tryOperatorIndices.append(index)
-                                if let (index, token) = iterator.next() {
-                                    switch token.type {
-                                    case .token where token.value == "?" ||  token.value == "!":
-                                        tryOperatorIndices.append(index)
-                                    default:
-                                        break
-                                    }
-                                }
-                            default:
-                                break
-                            }
-                        }
-                        for index in tryOperatorIndices {
-                            partTokens.remove(at: index)
-                        }
-                    }
+                    let containsThrows = containsThrowsFunction(part)
+                    let textTokens = containsThrows ? removeTryKeyword(source: source) : formatter.tokenize(source: source)
 
-                    if source.hasPrefix(".") {
-                        let text = (containsThrowsFunction ? "try " : "") + part.type.replacingOccurrences(of: "@lvalue ", with: "") + formatter.format(tokens: partTokens)
-                        let capturedExpression = CapturedExpression(text: text, column: column, source: source, expression: part)
-                        capturedExpressions.append(capturedExpression)
-                    } else {
-                        let text = (containsThrowsFunction ? "try " : "") + formatter.format(tokens: partTokens)
-                        let capturedExpression = CapturedExpression(text: text, column: column, source: source, expression: part)
-                        capturedExpressions.append(capturedExpression)
-                    }
+                    var text = containsThrows ? "try " : ""
+                    text += source.hasPrefix(".") ? part.type.replacingOccurrences(of: "@lvalue ", with: "") : ""
+                    text += formatter.format(tokens: textTokens)
+                    let capturedExpression = CapturedExpression(text: text, column: column, source: source, expression: part)
+                    capturedExpressions.append(capturedExpression)
                 case "dot_self_expr":
                     let source = completion.completeSource(range: partRange)
                     let tokens = formatter.tokenize(source: wholeSource)
@@ -136,7 +104,7 @@ struct ArgumentCaptor {
                     let capturedExpression = CapturedExpression(text: text, column: column, source: source, expression: part)
                     capturedExpressions.append(capturedExpression)
                 case "string_literal_expr":
-                    if !sourceFile[partRange].hasPrefix("\"") {
+                    if !partSource.hasPrefix("\"") {
                         return
                     }
                     let source = completion.completeStringLiteral(part, asserttion.expression)
@@ -159,37 +127,11 @@ struct ArgumentCaptor {
                     let source = partSource
                     let tokens = formatter.tokenize(source: wholeSource)
                     let column = columnInFunctionCall(start: wholeRange.start, target: partRange.end, tokens: tokens)
-                    // FIXME
-                    var containsThrowsFunction = false
-                    traverse(part) { (expression, _) in
-                        guard !containsThrowsFunction else { return }
-                        containsThrowsFunction = expression.rawValue == "call_expr" && expression.throwsModifier == "throws"
-                    }
-                    var partTokens = formatter.tokenize(source: source)
-                    if containsThrowsFunction {
-                        var iterator = partTokens.enumerated().makeIterator()
-                        var tryOperatorIndices = [Int]()
-                        while let (index, token) = iterator.next() {
-                            switch token.type {
-                            case .token where token.value == "try":
-                                tryOperatorIndices.append(index)
-                                if let (index, token) = iterator.next() {
-                                    switch token.type {
-                                    case .token where token.value == "?" ||  token.value == "!":
-                                        tryOperatorIndices.append(index)
-                                    default:
-                                        break
-                                    }
-                                }
-                            default:
-                                break
-                            }
-                        }
-                        for index in tryOperatorIndices {
-                            partTokens.remove(at: index)
-                        }
-                    }
-                    let text = (containsThrowsFunction ? "try " : "") + formatter.format(tokens: partTokens)
+
+                    let containsThrows = containsThrowsFunction(part)
+                    let textTokens = containsThrows ? removeTryKeyword(source: source) : formatter.tokenize(source: source)
+
+                    let text = (containsThrows ? "try " : "") + formatter.format(tokens: textTokens)
                     let capturedExpression = CapturedExpression(text: text, column: column, source: source, expression: part)
                     capturedExpressions.append(capturedExpression)
                 case "call_expr":
@@ -254,37 +196,10 @@ struct ArgumentCaptor {
                     }
                     let column = columnInFunctionCall(start: wholeRange.start, target: part.location, tokens: tokens)
 
-                    // FIXME
-                    var containsThrowsFunction = false
-                    traverse(part) { (expression, _) in
-                        guard !containsThrowsFunction else { return }
-                        containsThrowsFunction = expression.rawValue == "call_expr" && expression.throwsModifier == "throws"
-                    }
-                    var partTokens = formatter.tokenize(source: source)
-                    if containsThrowsFunction {
-                        var iterator = partTokens.enumerated().makeIterator()
-                        var tryOperatorIndices = [Int]()
-                        while let (index, token) = iterator.next() {
-                            switch token.type {
-                            case .token where token.value == "try":
-                                tryOperatorIndices.append(index)
-                                if let (index, token) = iterator.next() {
-                                    switch token.type {
-                                    case .token where token.value == "?" ||  token.value == "!":
-                                        tryOperatorIndices.append(index)
-                                    default:
-                                        break
-                                    }
-                                }
-                            default:
-                                break
-                            }
-                        }
-                        for index in tryOperatorIndices {
-                            partTokens.remove(at: index)
-                        }
-                    }
-                    var formatted = (containsThrowsFunction ? "try " : "") + formatter.format(tokens: partTokens, withHint: part)
+                    let containsThrows = containsThrowsFunction(part)
+                    let textTokens = containsThrows ? removeTryKeyword(source: source) : formatter.tokenize(source: source)
+
+                    var formatted = (containsThrows ? "try " : "") + formatter.format(tokens: textTokens, withHint: part)
                     if source.hasPrefix(".") || part.type!.contains("<") || part.argumentLabels == "nilLiteral:" {
                         formatted = formatted + " as \(part.type!.replacingOccurrences(of: "@lvalue ", with: ""))"
                     }
@@ -316,37 +231,10 @@ struct ArgumentCaptor {
                     let tokens = formatter.tokenize(source: wholeSource)
                     let column = columnInFunctionCall(start: wholeRange.start, target: part.location, tokens: tokens)
 
-                    // FIXME
-                    var containsThrowsFunction = false
-                    traverse(part) { (expression, _) in
-                        guard !containsThrowsFunction else { return }
-                        containsThrowsFunction = expression.rawValue == "call_expr" && expression.throwsModifier == "throws"
-                    }
-                    var partTokens = formatter.tokenize(source: source)
-                    if containsThrowsFunction {
-                        var iterator = partTokens.enumerated().makeIterator()
-                        var tryOperatorIndices = [Int]()
-                        while let (index, token) = iterator.next() {
-                            switch token.type {
-                            case .token where token.value == "try":
-                                tryOperatorIndices.append(index)
-                                if let (index, token) = iterator.next() {
-                                    switch token.type {
-                                    case .token where token.value == "?" ||  token.value == "!":
-                                        tryOperatorIndices.append(index)
-                                    default:
-                                        break
-                                    }
-                                }
-                            default:
-                                break
-                            }
-                        }
-                        for index in tryOperatorIndices {
-                            partTokens.remove(at: index)
-                        }
-                    }
-                    var text = (containsThrowsFunction ? "try " : "") + formatter.format(tokens: partTokens)
+                    let containsThrows = containsThrowsFunction(part)
+                    let textTokens = containsThrows ? removeTryKeyword(source: source) : formatter.tokenize(source: source)
+
+                    var text = (containsThrows ? "try " : "") + formatter.format(tokens: textTokens)
                     text = "(\(text)) as (\(part.type!.replacingOccurrences(of: "@lvalue ", with: "")))"
                     let capturedExpression = CapturedExpression(text: text, column: column, source: source, expression: part)
                     capturedExpressions.append(capturedExpression)
@@ -418,5 +306,44 @@ struct ArgumentCaptor {
             }
         }
         return __Util.displayWidth(of: source)
+    }
+
+    private func containsThrowsFunction(_ expression: Expression) -> Bool {
+        var containsThrowsFunction = false
+        traverse(expression) { (expression, stop) in
+            guard !containsThrowsFunction else {
+                stop = true
+                return
+            }
+            containsThrowsFunction = expression.rawValue == "call_expr" && expression.throwsModifier == "throws"
+        }
+        return containsThrowsFunction
+    }
+
+    private func removeTryKeyword(source: String) -> [Token] {
+        let formatter = SourceFormatter()
+        var tokens = formatter.tokenize(source: source)
+        var iterator = tokens.enumerated().makeIterator()
+        var tryIndices = [Int]()
+        while let (index, token) = iterator.next() {
+            switch token.type {
+            case .token where token.value == "try":
+                tryIndices.append(index)
+                if let (index, token) = iterator.next() {
+                    switch token.type {
+                    case .token where token.value == "?" ||  token.value == "!":
+                        tryIndices.append(index)
+                    default:
+                        break
+                    }
+                }
+            default:
+                break
+            }
+        }
+        for index in tryIndices {
+            tokens.remove(at: index)
+        }
+        return tokens
     }
 }
