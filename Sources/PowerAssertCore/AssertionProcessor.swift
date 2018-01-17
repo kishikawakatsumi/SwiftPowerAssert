@@ -27,7 +27,11 @@ struct AssertionProcessor {
     }
 
     private func process(_ assertion: Assertion) -> String {
+        #if os(macOS)
         let inUnitTests = NSClassFromString("XCTest") != nil
+        #else
+        let inUnitTests = true
+        #endif
 
         let captor = ArgumentCaptor(sourceFile: sourceFile)
         let expressions = captor.captureArguments(assertion)

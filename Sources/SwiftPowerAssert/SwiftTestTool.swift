@@ -22,6 +22,8 @@ import PowerAssertCore
 
 struct SwiftTestTool {
     func run(arguments: [String], verbose: Bool = false) throws {
+        let fileSystem = Basic.localFileSystem
+
         var swiftTestArguments: [String]
         if let first = arguments.first, first == "swift" {
             swiftTestArguments = Array(arguments.dropFirst())
@@ -107,8 +109,11 @@ struct SwiftTestTool {
             configuration = "debug"
         }
 
-        let sdk = try! SDK.macosx.path()
+        #if os(macOS)
         let targetTriple = "x86_64-apple-macosx10.10"
+        #else
+        let targetTriple = "x86_64-unknown-linux"
+        #endif
         let buildDirectory = buildPath.appendingPathComponent(targetTriple).appendingPathComponent(configuration).path
 
         let rawDependencies = try swiftPackage.showDependencies(packagePath: packagePathArgument, buildPath: buildPathArgument)
@@ -118,9 +123,8 @@ struct SwiftTestTool {
         var modulemapPaths = [String]()
         func findModules(_ dependencies: [Dependency]) {
             for dependency in dependencies {
-                var isDirectory: ObjCBool = false
                 let modulemapPath = URL(fileURLWithPath: dependency.path).appendingPathComponent("module.modulemap").path
-                if FileManager.default.fileExists(atPath: modulemapPath, isDirectory: &isDirectory) && !isDirectory.boolValue {
+                if fileSystem.exists(AbsolutePath(modulemapPath)) && fileSystem.isFile(AbsolutePath(modulemapPath)) {
                     modulemapPaths.append(modulemapPath)
                 }
                 findModules(dependency.dependencies)
@@ -128,7 +132,9 @@ struct SwiftTestTool {
         }
         findModules(dependency.dependencies)
 
-        let swiftArguments = [
+        #if os(macOS)
+        let sdk = try! SDK.macosx.path()
+        var swiftArguments = [
             "-sdk",
             sdk,
             "-target",
@@ -140,13 +146,23 @@ struct SwiftTestTool {
             "-I",
             buildDirectory
         ] + modulemapPaths.flatMap { ["-Xcc", "-fmodule-map-file=\($0)"] }
+        #else
+        var swiftArguments = [
+            "-target",
+            targetTriple,
+            "-F",
+            buildDirectory,
+            "-I",
+            buildDirectory
+        ]
+        #endif
+        swiftArguments += modulemapPaths.flatMap { ["-Xcc", "-fmodule-map-file=\($0)"] }
 
         for testTypeTerget in testTypeTergets {
             let path = URL(fileURLWithPath: testTypeTerget.path)
             let sources = testTypeTerget.sources.map { path.appendingPathComponent($0) }
             for source in sources {
-                var isDirectory: ObjCBool = false
-                if FileManager.default.fileExists(atPath: source.path, isDirectory: &isDirectory) && !isDirectory.boolValue {
+                if fileSystem.exists(AbsolutePath(source.path)) && fileSystem.isFile(AbsolutePath(source.path)) {
                     do {
                         let temporaryFile = try TemporaryFile(dir: temporaryDirectory.path, prefix: "Backup", suffix: source.lastPathComponent)
                         try FileManager.default.removeItem(atPath: temporaryFile.path.asString)
@@ -191,7 +207,11 @@ struct SwiftTestTool {
 }
 
 private struct SwiftPackage {
+    #if os(macOS)
     let exec = ["/usr/bin/xcrun", "swift", "package"]
+    #else
+    let exec = ["swift", "package"]
+    #endif
 
     func describe(packagePath: String?, buildPath: String?) throws -> String {
         var packageOptions = [String]()
@@ -243,7 +263,11 @@ private struct SwiftPackage {
 }
 
 private struct SwiftBuild {
+    #if os(macOS)
     let exec = ["/usr/bin/xcrun", "swift", "build"]
+    #else
+    let exec = ["swift", "build"]
+    #endif
 
     func build(arguments: [String]) throws {
         let command = Process(arguments: exec + arguments, redirectOutput: false)
@@ -259,7 +283,11 @@ private struct SwiftBuild {
 }
 
 private struct SwiftTest {
+    #if os(macOS)
     let exec = ["/usr/bin/xcrun", "swift", "test"]
+    #else
+    let exec = ["swift", "test"]
+    #endif
 
     func test(arguments: [String]) throws {
         let command = Process(arguments: exec + arguments, redirectOutput: false)

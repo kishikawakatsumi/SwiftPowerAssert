@@ -47,7 +47,11 @@ class TestRunner {
 
         try! __Util.source.write(toFile: env.utilitiesFilePath, atomically: true, encoding: .utf8)
         let main = """
+            #if os(macOS)
             Tests().testMethod()
+            #else
+            Tests(name: "Tests", testClosure: { _ in }).testMethod()
+            #endif
             """
         try! main.write(toFile: env.mainFilePath, atomically: true, encoding: .utf8)
     }

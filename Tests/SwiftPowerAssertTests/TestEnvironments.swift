@@ -43,10 +43,15 @@ class TestEnvironments {
         return try! SDK.macosx.path()
     }()
     var targetTriple: String {
+        #if os(macOS)
         return "x86_64-apple-macosx10.10"
+        #else
+        return "x86_64-unknown-linux"
+        #endif
     }
     lazy var parseOptions: [String] = {
         let buildDirectory = temporaryDirectory.path.asString
+        #if os(macOS)
         return [
             "-sdk",
             sdk,
@@ -59,8 +64,19 @@ class TestEnvironments {
             "-I",
             buildDirectory
         ]
+        #else
+        return [
+            "-target",
+            targetTriple,
+            "-F",
+            buildDirectory,
+            "-I",
+            buildDirectory
+        ]
+        #endif
     }()
     lazy var execOptions: [String] = {
+        #if os(macOS)
         return [
             "/usr/bin/xcrun",
             "swiftc",
@@ -82,5 +98,21 @@ class TestEnvironments {
             "-Xlinker",
             "\(sdk)/../../../Developer/Library/Frameworks",
         ]
+        #else
+        return [
+            "swiftc",
+            "-O",
+            "-whole-module-optimization",
+            sourceFilePath,
+            utilitiesFilePath,
+            mainFilePath,
+            "-o",
+            executablePath,
+            "-target",
+            targetTriple,
+            "-Xlinker",
+            "-rpath",
+        ]
+        #endif
     }()
 }

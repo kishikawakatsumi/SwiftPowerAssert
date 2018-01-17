@@ -27,8 +27,8 @@ class Transformer {
         var lineNumber = 1
         var offset = 0
         var sourceLines = [SourceLine]()
-        source.enumerateLines { (line, stop) in
-            sourceLines.append(SourceLine(text: line.utf8, lineNumber: lineNumber, offset: offset))
+        for line in source.split(separator: "\n", omittingEmptySubsequences: false) {
+            sourceLines.append(SourceLine(text: String(line).utf8, lineNumber: lineNumber, offset: offset))
             lineNumber += 1
             offset += line.utf8.count + 1 // characters + newline
         }

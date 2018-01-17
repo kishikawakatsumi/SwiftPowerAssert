@@ -22,6 +22,8 @@ import PowerAssertCore
 
 struct XCTestTool {
     func run(arguments: [String], verbose: Bool = false) throws {
+        let fileSystem = Basic.localFileSystem
+
         let xcarguments: [String]
         if let first = arguments.first, first == "xcodebuild" {
             xcarguments = Array(arguments.dropFirst())
@@ -126,8 +128,7 @@ struct XCTestTool {
         
         let sources = targetBuildSettings.sources().filter { $0.pathExtension == "swift" }
         for source in sources {
-            var isDirectory: ObjCBool = false
-            if FileManager.default.fileExists(atPath: source.path, isDirectory: &isDirectory) && !isDirectory.boolValue {
+            if fileSystem.exists(AbsolutePath(source.path)) && fileSystem.isFile(AbsolutePath(source.path)) {
                 do {
                     let temporaryFile = try TemporaryFile(dir: temporaryDirectory.path, prefix: "Backup", suffix: source.lastPathComponent)
                     try FileManager.default.removeItem(atPath: temporaryFile.path.asString)

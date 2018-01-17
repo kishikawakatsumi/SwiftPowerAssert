@@ -960,11 +960,19 @@ extension __Util {
                         .replacingOccurrences(of: "\\0", with: "\\\\0")
                 }
                 static func valueToString<T>(_ value: T?) -> String {
+                    #if os(macOS)
                     switch value {
                     case .some(let v) where v is String || v is Selector: return "\\"\\(__Util.escapeString("\\(v)"))\\""
                     case .some(let v): return "\\(v)".replacingOccurrences(of: "\\n", with: " ")
                     case .none: return "nil"
                     }
+                    #else
+                    switch value {
+                    case .some(let v) where v is String: return "\\"\\(__Util.escapeString("\\(v)"))\\""
+                    case .some(let v): return "\\(v)".replacingOccurrences(of: "\\n", with: " ")
+                    case .none: return "nil"
+                    }
+                    #endif
                 }
                 static func align(_ message: inout String, current: inout Int, column: Int, string: String) {
                     while current < column - 1 {
