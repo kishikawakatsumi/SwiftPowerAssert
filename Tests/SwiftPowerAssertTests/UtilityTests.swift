@@ -21,12 +21,16 @@ import SwiftPowerAssertCore
 
 class UtilityTests: XCTestCase {
     func testDisplayWidth() throws {
-        XCTAssertEqual(__Util.displayWidth(of: "Katsumi Kishikawa", inEastAsian: true), 17)
-        XCTAssertEqual(__Util.displayWidth(of: "岸川克己", inEastAsian: true), 8)
-        XCTAssertEqual(__Util.displayWidth(of: "岸川 克己", inEastAsian: true), 9)
-        XCTAssertEqual(__Util.displayWidth(of: "岸川克己😇", inEastAsian: true), 10)
-        XCTAssertEqual(__Util.displayWidth(of: "岸川 克己😇", inEastAsian: true), 11)
-        XCTAssertEqual(__Util.displayWidth(of: "😇岸川克己🇯🇵", inEastAsian: true), 12)
-        XCTAssertEqual(__Util.displayWidth(of: "😇岸川 克己🇯🇵", inEastAsian: true), 13)
+        XCTAssertEqual(__Util.displayWidth(of: "Katsumi Kishikawa"), 17)
+        XCTAssertEqual(__Util.displayWidth(of: "岸川克己"), 8)
+        XCTAssertEqual(__Util.displayWidth(of: "岸川 克己"), 9)
+        XCTAssertEqual(__Util.displayWidth(of: "岸川克己😇"), 10)
+        XCTAssertEqual(__Util.displayWidth(of: "岸川 克己😇"), 11)
+        XCTAssertEqual(__Util.displayWidth(of: "😇岸川克己🇯🇵"), 12)
+        XCTAssertEqual(__Util.displayWidth(of: "😇岸川 克己🇯🇵"), 13)
+
+        XCTAssertEqual(__Util.displayWidth(of: "👩‍👩‍👧‍👧岸川👨‍👨‍👦‍👦克己🇯🇵"), 14)
+        XCTAssertEqual(__Util.displayWidth(of: "​​​​岸川👨‍👨‍👦‍👦克己🇯🇵"), 12)
+        XCTAssertEqual(__Util.displayWidth(of: "​​​​岸川克己"), 8)
     }
 }
