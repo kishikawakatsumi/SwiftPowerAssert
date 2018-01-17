@@ -6,7 +6,8 @@ import PackageDescription
 let package = Package(
     name: "SwiftPowerAssert",
     products: [
-        .executable(name: "swift-power-assert", targets: ["SwiftPowerAssert"])
+        .executable(name: "swift-power-assert", targets: ["SwiftPowerAssert"]),
+        .library(name: "PowerAssertCore", type: .dynamic, targets: ["PowerAssertCore"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-package-manager.git", from: "0.1.0")
@@ -14,15 +15,15 @@ let package = Package(
     targets: [
         .target(
             name: "SwiftPowerAssert",
-            dependencies: ["SwiftPowerAssertCore", "Utility"]
+            dependencies: ["PowerAssertCore", "Utility"]
         ),
         .target(
-            name: "SwiftPowerAssertCore",
+            name: "PowerAssertCore",
             dependencies: ["Utility"]
         ),
         .testTarget(
                 name: "SwiftPowerAssertTests",
-                dependencies: ["SwiftPowerAssertCore"]
+                dependencies: ["PowerAssertCore"]
         )
     ]
 )

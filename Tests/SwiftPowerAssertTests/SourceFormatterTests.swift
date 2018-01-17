@@ -17,7 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 import XCTest
-@testable import SwiftPowerAssertCore
+@testable import PowerAssertCore
 
 class SourceFormatterTests: XCTestCase {
     func testSourceTokenizer() {

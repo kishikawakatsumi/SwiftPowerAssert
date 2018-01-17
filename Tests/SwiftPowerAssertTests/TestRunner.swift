@@ -18,7 +18,7 @@
 
 import Foundation
 import Basic
-import SwiftPowerAssertCore
+import PowerAssertCore
 
 class TestRunner {
     let env = TestEnvironments()

@@ -18,7 +18,7 @@
 
 import XCTest
 import Basic
-@testable import SwiftPowerAssertCore
+@testable import PowerAssertCore
 
 class ParserTests: XCTestCase {
     func testParser() {
