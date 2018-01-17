@@ -37,6 +37,8 @@ class ASTParser {
         for node in sourceFileNode.children {
             for token in node.value {
                 switch (token.type, token.value) {
+                case (.token, "top_level_code_decl"):
+                    declarations.append(.topLevelCode(parseTopLevelCodeDeclarationNode(node: node)))
                 case (.token, "import_decl"):
                     declarations.append(.import(parseImportDeclarationNode(node: node)))
                 case (.token, "struct_decl"):
@@ -55,6 +57,21 @@ class ASTParser {
             }
         }
         return AST(declarations: declarations)
+    }
+
+    private func parseTopLevelCodeDeclarationNode(node: ASTNode<[ASTToken]>) -> TopLevelCodeDeclaration {
+        var statements = [Statement]()
+        for node in node.children {
+            for token in node.value {
+                switch (token.type, token.value) {
+                case (.token, "brace_stmt"):
+                    statements.append(.expression(parseExpressionNode(node: node)))
+                default:
+                    break
+                }
+            }
+        }
+        return TopLevelCodeDeclaration(statements: statements)
     }
 
     private func parseImportDeclarationNode(node: ASTNode<[ASTToken]>) -> ImportDeclaration {
