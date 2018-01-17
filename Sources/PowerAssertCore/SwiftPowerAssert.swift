@@ -24,7 +24,9 @@ public final class SwiftPowerAssert {
     private let dependencies: [URL]
     private let bridgingHeader: URL?
 
-    public init(buildOptions: [String], dependencies: [URL], bridgingHeader: URL? = nil) {
+    private let fileSystem = Basic.localFileSystem
+
+    public init(buildOptions: [String], dependencies: [URL] = [], bridgingHeader: URL? = nil) {
         self.buildOptions = buildOptions
         self.dependencies = dependencies
         self.bridgingHeader = bridgingHeader
@@ -37,7 +39,8 @@ public final class SwiftPowerAssert {
     private func transform(sourceFile: URL, verbose: Bool = false) throws -> String {
         let sourceText: String
         do {
-            sourceText = try String(contentsOf: sourceFile)
+            let contents = try fileSystem.readFileContents(AbsolutePath(sourceFile.path))
+            sourceText = contents.asReadableString
         } catch {
             throw SwiftPowerAssertError.internalError("failed to read source file from: \(sourceFile)", error)
         }
@@ -52,11 +55,14 @@ public final class SwiftPowerAssert {
     }
 
     private func buildArguments(source: URL) -> [String] {
-        let arguments = [
-            "/usr/bin/xcrun",
-            "swift",
+        #if os(macOS)
+        let exec = ["/usr/bin/xcrun", "swift"]
+        #else
+        let exec = ["swift"]
+        #endif
+        let arguments = exec + [
             "-frontend",
-            "-parse-as-library",
+            "-suppress-warnings",
             "-dump-ast"
         ]
         let importObjcHeaderOption: [String]

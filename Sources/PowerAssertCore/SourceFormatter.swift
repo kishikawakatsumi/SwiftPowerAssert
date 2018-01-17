@@ -344,7 +344,7 @@ class Tokenizer {
                 switch character {
                 case "\"":
                     let startIndex = source.index(source.startIndex, offsetBy: index)
-                    if source[startIndex...].hasPrefix("\"\"\"") {
+                    if String(source[startIndex...]).hasPrefix("\"\"\"") {
                         _ = iterator.next()
                         _ = iterator.next()
                         state.tokens.append(Token(type: .multilineString(indent), value: String(state.storage.prefix(state.storage.count - 2) /* Remove a trailing newline */), location: location))
@@ -387,7 +387,7 @@ class Tokenizer {
                 switch character {
                 case "\"":
                     let startIndex = source.index(source.startIndex, offsetBy: index)
-                    if source[startIndex...].hasPrefix("\"\"\"") {
+                    if String(source[startIndex...]).hasPrefix("\"\"\"") {
                         _ = iterator.next()
                         _ = iterator.next()
                         state.currentLocation = SourceLocation(line: state.currentLocation.line, column: state.currentLocation.column + 2)
@@ -479,7 +479,7 @@ class Tokenizer {
 
     private func startString(_ iterator: inout EnumeratedIterator<IndexingIterator<String>>, _ index: Int, _ state: Tokenizer.State, _ source: String) {
         let startIndex = source.index(source.startIndex, offsetBy: index)
-        if source[startIndex...].hasPrefix("\"\"\"\n") {
+        if String(source[startIndex...]).hasPrefix("\"\"\"\n") {
             _ = iterator.next()
             _ = iterator.next()
             _ = iterator.next()

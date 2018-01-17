@@ -106,9 +106,12 @@ class ParserTests: XCTestCase {
 
         try! source.write(toFile: env.sourceFilePath, atomically: true, encoding: .utf8)
 
-        let arguments = [
-            "/usr/bin/xcrun",
-            "swift",
+        #if os(macOS)
+        let exec = ["/usr/bin/xcrun", "swift"]
+        #else
+        let exec = ["swift"]
+        #endif
+        let arguments = exec + [
             "-frontend",
             "-parse-as-library",
             "-dump-ast"
