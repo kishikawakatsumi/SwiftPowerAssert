@@ -150,24 +150,27 @@ class Transformer {
         
         var sourceText = sourceFile.sourceText
         for replacement in replacements.reversed() {
-            let sourceRange = replacement.sourceRange
-            let instrumentedSource = replacement.sourceText
+            let range = replacement.sourceRange
+            let enhancedSource = replacement.sourceText
 
             let startIndex: String.Index
-            if sourceRange.start.line > 0 {
-                startIndex = sourceText.index(sourceText.startIndex, offsetBy: sourceFile.sourceLines[sourceRange.start.line].offset + sourceRange.start.column)
+            if range.start.line > 0 {
+                startIndex = sourceText.index(sourceText.startIndex, offsetBy: sourceFile.sourceLines[range.start.line].offset + range.start.column)
             } else {
-                startIndex = sourceText.index(sourceText.startIndex, offsetBy: sourceRange.start.column)
+                startIndex = sourceText.index(sourceText.startIndex, offsetBy: range.start.column)
             }
             let endIndex: String.Index
-            if sourceRange.end.line > 0 {
-                endIndex = sourceText.index(sourceText.startIndex, offsetBy: sourceFile.sourceLines[sourceRange.end.line].offset + sourceRange.end.column)
+            if range.end.line > 0 {
+                endIndex = sourceText.index(sourceText.startIndex, offsetBy: sourceFile.sourceLines[range.end.line].offset + range.end.column)
             } else {
-                endIndex = sourceText.index(sourceText.startIndex, offsetBy: sourceRange.end.column)
+                endIndex = sourceText.index(sourceText.startIndex, offsetBy: range.end.column)
             }
             let prefix = sourceText.prefix(upTo: startIndex)
             let suffix = sourceText.suffix(from: endIndex)
-            sourceText = (String(prefix)! + instrumentedSource + String(suffix)!).utf8
+            sourceText =
+                (String(prefix)! +
+                enhancedSource + String(repeating: "\n", count: range.end.line - range.start.line)
+                + String(suffix)!).utf8
         }
 
         return String(sourceText)
