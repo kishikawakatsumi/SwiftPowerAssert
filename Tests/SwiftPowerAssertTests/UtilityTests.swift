@@ -17,7 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 import XCTest
-import SwiftPowerAssertCore
+import PowerAssertCore
 
 class UtilityTests: XCTestCase {
     func testDisplayWidth() throws {

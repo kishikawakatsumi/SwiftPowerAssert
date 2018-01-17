@@ -19,7 +19,7 @@
 import Foundation
 import Basic
 import Utility
-import SwiftPowerAssertCore
+import PowerAssertCore
 
 do {
     let parser = ArgumentParser(commandName: "swift-power-assert", usage: "[options] subcommand [options]", overview: "Provide diagrammed assertions")

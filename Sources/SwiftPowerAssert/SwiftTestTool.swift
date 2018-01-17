@@ -18,7 +18,7 @@
 
 import Foundation
 import Basic
-import SwiftPowerAssertCore
+import PowerAssertCore
 
 struct SwiftTestTool {
     func run(arguments: [String], verbose: Bool = false) throws {
