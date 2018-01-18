@@ -55,12 +55,17 @@ extension Expression: Hashable {
 }
 
 enum Declaration {
+    case `topLevelCode`(TopLevelCodeDeclaration)
     case `import`(ImportDeclaration)
     case `struct`(StructDeclaration)
     case `class`(ClassDeclaration)
     case `enum`(EnumDeclaration)
     case `extension`(ExtensionDeclaration)
     case function(FunctionDeclaration)
+}
+
+struct TopLevelCodeDeclaration {
+    let statements: [Statement]
 }
 
 struct ImportDeclaration {
