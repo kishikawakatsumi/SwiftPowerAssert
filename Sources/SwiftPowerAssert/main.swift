@@ -31,6 +31,10 @@ do {
     let xctest = parser.add(subparser: "xctest", overview: "Run XCTest with power assertion.")
     let xxcodebuild = xctest.add(option: "-Xxcodebuild", kind: [String].self, strategy: .remaining, usage: "Arguments to pass to 'xcodebuild' command")
 
+    let transform = parser.add(subparser: "transform", overview: "")
+    let source = transform.add(positional: "source", kind: String.self)
+    let options = xctest.add(option: "-options", kind: [String].self, strategy: .remaining)
+
     let arguments = Array(CommandLine.arguments.dropFirst())
     let result = try parser.parse(arguments)
 
@@ -50,6 +54,14 @@ do {
             try command.run(arguments: arguments, verbose: isVerbose)
         } else {
             xctest.printUsage(on: stdoutStream)
+        }
+    case "transform"?:
+        if let source = result.get(source) {
+            let options = result.get(options) ?? []
+            let command = TransformTool()
+            try command.run(source: URL(fileURLWithPath: source), options: options, verbose: isVerbose)
+        } else {
+            transform.printUsage(on: stdoutStream)
         }
     default:
         parser.printUsage(on: stdoutStream)
