@@ -22,104 +22,72 @@ import PowerAssertCore
 
 struct SwiftTestTool {
     func run(arguments: [String], verbose: Bool = false) throws {
-        let fileSystem = Basic.localFileSystem
-
-        var swiftTestArguments: [String]
-        if let first = arguments.first, first == "swift" {
-            swiftTestArguments = Array(arguments.dropFirst())
-        } else {
-            swiftTestArguments = arguments
-        }
-
-        if let command = swiftTestArguments.first, !command.hasPrefix("-") {
-            guard command == "test" else {
-                throw SwiftPowerAssertError.invalidArgument("only 'test' swift subcommand is supported.")
-            }
-            swiftTestArguments = Array(swiftTestArguments.dropFirst())
-        }
-
-        var iterator = swiftTestArguments.makeIterator()
-        var configurationArgument: String?
-        var buildPathArgument: String?
-        var packagePathArgument: String?
-        while let option = iterator.next() {
-            switch option {
-            case "--configuration", "-c":
-                configurationArgument = iterator.next()
-            case "--build-path":
-                buildPathArgument = iterator.next()
-            case "--package-path":
-                packagePathArgument = iterator.next()
-            default:
-                break
-            }
-        }
+        let options = try SwiftTestOptions(arguments)
 
         print("Reading project settings...")
-        let swiftPackage = SwiftPackage()
-        let rawPackageDescription = try swiftPackage.describe(packagePath: packagePathArgument, buildPath: buildPathArgument)
+        let swiftPackage = SwiftPackage(packagePath: options.packagePath, buildPath: options.buildPath)
+        let packageDescription = try swiftPackage.describe(verbose: verbose)
 
-        let packageDescription = try JSONDecoder().decode(PackageDescription.self, from: rawPackageDescription.data(using: .utf8)!)
         let testTypeTergets = packageDescription.targets.filter { $0.type == "test" }
+        guard !testTypeTergets.isEmpty else { throw SwiftTestError.noUnitTestBundleFound }
 
-        guard !testTypeTergets.isEmpty else {
-            throw SwiftPowerAssertError.noUnitTestBundle
-        }
+        let dependency = try swiftPackage.showDependencies(verbose: verbose)
+        let swiftOptions = constructSwiftOptions(swiftTestOptions: options, dependency: dependency)
 
-        print("Build projedt target and dependencies...")
+        print("Build project target and dependencies...")
         let swiftBuild = SwiftBuild()
-        var swiftBuildArgument = [String]()
-        if let configurationArgument = configurationArgument {
-            swiftBuildArgument.append(contentsOf: ["--configuration", configurationArgument])
-        }
-        if let buildPathArgument = buildPathArgument {
-            swiftBuildArgument.append(contentsOf: ["--build-path", buildPathArgument])
-        }
-        if let packagePathArgument = packagePathArgument {
-            swiftBuildArgument.append(contentsOf: ["--package-path", packagePathArgument])
-        }
-        try swiftBuild.build(arguments: swiftBuildArgument)
+        try swiftBuild.build(arguments: options.rawOptions, verbose: verbose)
 
-        let temporaryDirectory: TemporaryDirectory
-        do {
-            temporaryDirectory = try TemporaryDirectory(prefix: "com.kishikawakatsumi.swift-power-assert", removeTreeOnDeinit: true)
-        } catch {
-            throw SwiftPowerAssertError.writeFailed("unable to create backup directory", error)
-        }
+        let temporaryDirectory = try TemporaryDirectory(prefix: "com.kishikawakatsumi.swift-power-assert", removeTreeOnDeinit: true)
         var backupFiles = [String: TemporaryFile]()
-        defer {
-            restoreOriginalSourceFiles(from: backupFiles)
+        defer { restoreOriginalSourceFiles(from: backupFiles) }
+
+        print("Transforming test files...")
+        for testTypeTerget in testTypeTergets {
+            let path = URL(fileURLWithPath: testTypeTerget.path)
+            let sources = testTypeTerget.sources.map { path.appendingPathComponent($0) }
+            for source in sources {
+                if Basic.localFileSystem.exists(AbsolutePath(source.path)) && Basic.localFileSystem.isFile(AbsolutePath(source.path)) {
+                    let temporaryFile = try TemporaryFile(dir: temporaryDirectory.path, prefix: "Backup", suffix: source.lastPathComponent)
+                    try FileManager.default.removeItem(atPath: temporaryFile.path.asString)
+                    try FileManager.default.copyItem(atPath: source.path, toPath: temporaryFile.path.asString)
+                    backupFiles[source.path] = temporaryFile
+
+                    print("  Processing: \(source.lastPathComponent)")
+                    let dependencies = sources.filter { $0 != source }
+                    let processor = SwiftPowerAssert(buildOptions: swiftOptions + ["-module-name", testTypeTerget.name], dependencies: dependencies)
+                    let transformed = try processor.processFile(input: source, verbose: verbose)
+
+                    if let first = sources.first, first == source {
+                        try (transformed + "\n\n\n" + __Util.source).write(to: source, atomically: true, encoding: .utf8)
+                    } else {
+                        try transformed.write(to: source, atomically: true, encoding: .utf8)
+                    }
+                }
+            }
+
+            print("Testing \(testTypeTerget.name) ...")
+            let swiftTest = SwiftTest()
+            try swiftTest.test(arguments: options.rawOptions, verbose: verbose)
         }
+    }
+
+    private func constructSwiftOptions(swiftTestOptions: SwiftTestOptions, dependency: Dependency) -> [String] {
+        let configuration = swiftTestOptions.configuration ?? "debug"
 
         let buildPath: URL
-        if let buildPathArgument = buildPathArgument {
-            buildPath = URL(fileURLWithPath: buildPathArgument)
+        if let buildPathOption = swiftTestOptions.buildPath {
+            buildPath = URL(fileURLWithPath: buildPathOption)
         } else {
-            if let packagePathArgument = packagePathArgument {
-                buildPath = URL(fileURLWithPath: packagePathArgument).appendingPathComponent(".build")
+            if let packagePath = swiftTestOptions.packagePath {
+                buildPath = URL(fileURLWithPath: packagePath).appendingPathComponent(".build")
             } else {
                 buildPath = URL(fileURLWithPath: "./.build")
             }
         }
+        let buildDirectory = buildPath.appendingPathComponent(configuration).path
 
-        let configuration: String
-        if let configurationArgument = configurationArgument {
-            configuration = configurationArgument
-        } else {
-            configuration = "debug"
-        }
-
-        #if os(macOS)
-        let targetTriple = "x86_64-apple-macosx10.10"
-        #else
-        let targetTriple = "x86_64-unknown-linux"
-        #endif
-        let buildDirectory = buildPath.appendingPathComponent(targetTriple).appendingPathComponent(configuration).path
-
-        let rawDependencies = try swiftPackage.showDependencies(packagePath: packagePathArgument, buildPath: buildPathArgument)
-
-        let dependency = try! JSONDecoder().decode(Dependency.self, from: rawDependencies.data(using: .utf8)!)
-
+        let fileSystem = Basic.localFileSystem
         var modulemapPaths = [String]()
         func findModules(_ dependencies: [Dependency]) {
             for dependency in dependencies {
@@ -132,66 +100,18 @@ struct SwiftTestTool {
         }
         findModules(dependency.dependencies)
 
+        var buildOptions = [String]()
         #if os(macOS)
         let sdk = try! SDK.macosx.path()
-        var swiftArguments = [
-            "-sdk",
-            sdk,
-            "-target",
-            targetTriple,
-            "-F",
-            sdk + "/../../../Developer/Library/Frameworks",
-            "-F",
-            buildDirectory,
-            "-I",
-            buildDirectory
-        ] + modulemapPaths.flatMap { ["-Xcc", "-fmodule-map-file=\($0)"] }
+        buildOptions = ["-sdk", sdk, "-F", sdk + "/../../../Developer/Library/Frameworks"]
+        let targetTriple = "x86_64-apple-macosx10.10"
         #else
-        var swiftArguments = [
-            "-target",
-            targetTriple,
-            "-F",
-            buildDirectory,
-            "-I",
-            buildDirectory
-        ]
+        let targetTriple = "x86_64-unknown-linux"
         #endif
-        swiftArguments += modulemapPaths.flatMap { ["-Xcc", "-fmodule-map-file=\($0)"] }
+        buildOptions += ["-target", targetTriple, "-F", buildDirectory, "-I", buildDirectory]
+        buildOptions += modulemapPaths.flatMap { ["-Xcc", "-fmodule-map-file=\($0)"] }
 
-        for testTypeTerget in testTypeTergets {
-            let path = URL(fileURLWithPath: testTypeTerget.path)
-            let sources = testTypeTerget.sources.map { path.appendingPathComponent($0) }
-            for source in sources {
-                if fileSystem.exists(AbsolutePath(source.path)) && fileSystem.isFile(AbsolutePath(source.path)) {
-                    do {
-                        let temporaryFile = try TemporaryFile(dir: temporaryDirectory.path, prefix: "Backup", suffix: source.lastPathComponent)
-                        try FileManager.default.removeItem(atPath: temporaryFile.path.asString)
-                        try FileManager.default.copyItem(atPath: source.path, toPath: temporaryFile.path.asString)
-                        backupFiles[source.path] = temporaryFile
-                    } catch {
-                        throw SwiftPowerAssertError.writeFailed("unable to backup source files", error)
-                    }
-
-                    print("\tProcessing: \(source.lastPathComponent)")
-                    let dependencies = sources.filter { $0 != source }
-                    let processor = SwiftPowerAssert(buildOptions: swiftArguments + ["-module-name", testTypeTerget.name], dependencies: dependencies)
-                    let transformed = try processor.processFile(input: source, verbose: verbose)
-                    do {
-                        if let first = sources.first, first == source {
-                            try (transformed + "\n\n\n" + __Util.source).write(to: source, atomically: true, encoding: .utf8)
-                        } else {
-                            try transformed.write(to: source, atomically: true, encoding: .utf8)
-                        }
-                    } catch {
-                        throw SwiftPowerAssertError.writeFailed("failed to instrument file", error)
-                    }
-                }
-            }
-
-            print("Testing \(testTypeTerget.name) ...")
-            let swiftTest = SwiftTest()
-            try swiftTest.test(arguments: swiftTestArguments)
-        }
+        return buildOptions
     }
 
     private func restoreOriginalSourceFiles(from backupFiles: [String: TemporaryFile]) {
@@ -206,99 +126,148 @@ struct SwiftTestTool {
     }
 }
 
-private struct SwiftPackage {
-    #if os(macOS)
-    let exec = ["/usr/bin/xcrun", "swift", "package"]
-    #else
-    let exec = ["swift", "package"]
-    #endif
+struct SwiftTestOptions {
+    var configuration: String?
+    var buildPath: String?
+    var packagePath: String?
+    var rawOptions: [String]
 
-    func describe(packagePath: String?, buildPath: String?) throws -> String {
-        var packageOptions = [String]()
-        if let packagePath = packagePath {
-            packageOptions.append(contentsOf: ["--package-path", packagePath])
+    var buildOptions: [String] {
+        var options = [String]()
+        if let configuration = configuration {
+            options.append(contentsOf: ["--configuration", configuration])
         }
         if let buildPath = buildPath {
-            packageOptions.append(contentsOf: ["--build-path", buildPath])
+            options.append(contentsOf: ["--build-path", buildPath])
         }
-        let command = Process(arguments: exec + packageOptions + ["describe", "--type", "json"])
+        if let packagePath = packagePath {
+            options.append(contentsOf: ["--package-path", packagePath])
+        }
+        return options
+    }
+
+    init(_ arguments: [String]) throws {
+        var options: [String]
+        if let first = arguments.first, first == "swift" {
+            options = Array(arguments.dropFirst())
+        } else {
+            options = arguments
+        }
+        if let subcommand = options.first, !subcommand.hasPrefix("-") {
+            guard subcommand == "test" else {
+                throw SwiftTestError.subcommandNotSupported(subcommand)
+            }
+            options = Array(options.dropFirst())
+        }
+        rawOptions = options
+
+        var iterator = options.makeIterator()
+        while let option = iterator.next() {
+            switch option {
+            case "--configuration", "-c":
+                configuration = iterator.next()
+            case "--build-path":
+                buildPath = iterator.next()
+            case "--package-path":
+                packagePath = iterator.next()
+            default:
+                break
+            }
+        }
+    }
+}
+
+private class SwiftTool {
+    #if os(macOS)
+    let exec = ["/usr/bin/xcrun", "swift"]
+    #else
+    let exec = ["swift"]
+    #endif
+
+    let toolName: String
+    let redirectOutput: Bool
+
+    init(toolName: String, redirectOutput: Bool = true) {
+        self.toolName = toolName
+        self.redirectOutput = redirectOutput
+    }
+
+    var options: [String] {
+        return []
+    }
+
+    func run(_ arguments: [String], verbose: Bool = false) throws -> String {
+        let command = Process(arguments: exec + [toolName] + options + arguments, redirectOutput: redirectOutput, verbose: verbose)
         try! command.launch()
         let result = try! command.waitUntilExit()
         let output = try! result.utf8Output()
         switch result.exitStatus {
         case .terminated(let code) where code == 0:
-            let index = output.index { $0 == "{" }
-            if let index = index {
-                return String(output[index...])
-            }
             return output
         default:
-            throw SwiftPowerAssertError.taskError("failed to run the following command: '\(command.arguments.joined(separator: " "))'")
+            let errorOutput = try result.utf8stderrOutput()
+            throw PowerAssertError.executingSubprocessFailed(command: command.arguments.joined(separator: " "), output: errorOutput)
         }
     }
+}
 
-    func showDependencies(packagePath: String?, buildPath: String?) throws -> String {
-        var packageOptions = [String]()
+private class SwiftPackage: SwiftTool {
+    let packagePath: String?
+    let buildPath: String?
+
+    init(packagePath: String?, buildPath: String?) {
+        self.buildPath = buildPath
+        self.packagePath = packagePath
+        super.init(toolName: "package")
+    }
+
+    override var options: [String] {
+        var options = [String]()
         if let packagePath = packagePath {
-            packageOptions.append(contentsOf: ["--package-path", packagePath])
+            options.append(contentsOf: ["--package-path", packagePath])
         }
         if let buildPath = buildPath {
-            packageOptions.append(contentsOf: ["--build-path", buildPath])
+            options.append(contentsOf: ["--build-path", buildPath])
         }
-        let command = Process(arguments: exec + packageOptions + ["show-dependencies", "--format", "json"])
-        try! command.launch()
-        let result = try! command.waitUntilExit()
-        let output = try! result.utf8Output()
-        switch result.exitStatus {
-        case .terminated(let code) where code == 0:
-            let index = output.index { $0 == "{" }
-            if let index = index {
-                return String(output[index...])
-            }
-            return output
-        default:
-            throw SwiftPowerAssertError.taskError("failed to run the following command: '\(command.arguments.joined(separator: " "))'")
+        return options
+    }
+
+    func describe(verbose: Bool = false) throws -> PackageDescription {
+        let output = cleansingOutput(try run(["describe", "--type", "json"], verbose: verbose))
+        return try JSONDecoder().decode(PackageDescription.self, from: output.data(using: .utf8)!)
+    }
+
+    func showDependencies(verbose: Bool = false) throws -> Dependency {
+        let output = cleansingOutput(try run(["show-dependencies", "--format", "json"], verbose: verbose))
+        return try! JSONDecoder().decode(Dependency.self, from: output.data(using: .utf8)!)
+    }
+
+    private func cleansingOutput(_ output: String) -> String {
+        let index = output.index { $0 == "{" }
+        if let index = index {
+            return String(output[index...])
         }
+        return output
     }
 }
 
-private struct SwiftBuild {
-    #if os(macOS)
-    let exec = ["/usr/bin/xcrun", "swift", "build"]
-    #else
-    let exec = ["swift", "build"]
-    #endif
+private class SwiftBuild: SwiftTool {
+    init() {
+        super.init(toolName: "build", redirectOutput: false)
+    }
 
-    func build(arguments: [String]) throws {
-        let command = Process(arguments: exec + arguments, redirectOutput: false)
-        try! command.launch()
-        let result = try! command.waitUntilExit()
-        switch result.exitStatus {
-        case .terminated(let code) where code == 0:
-            return
-        default:
-            throw SwiftPowerAssertError.taskError("failed to run the following command: '\(command.arguments.joined(separator: " "))'")
-        }
+    func build(arguments: [String], verbose: Bool = false) throws {
+        _ = try run(arguments, verbose: verbose)
     }
 }
 
-private struct SwiftTest {
-    #if os(macOS)
-    let exec = ["/usr/bin/xcrun", "swift", "test"]
-    #else
-    let exec = ["swift", "test"]
-    #endif
+private class SwiftTest: SwiftTool {
+    init() {
+        super.init(toolName: "test", redirectOutput: false)
+    }
 
-    func test(arguments: [String]) throws {
-        let command = Process(arguments: exec + arguments, redirectOutput: false)
-        try! command.launch()
-        let result = try! command.waitUntilExit()
-        switch result.exitStatus {
-        case .terminated(let code) where code == 0:
-            return
-        default:
-            throw SwiftPowerAssertError.taskError("failed to run the following command: '\(command.arguments.joined(separator: " "))'")
-        }
+    func test(arguments: [String], verbose: Bool = false) throws {
+        _ = try run(arguments, verbose: verbose)
     }
 }
 
@@ -332,4 +301,20 @@ private struct Dependency: Decodable {
     let url: String
     let version: String
     let dependencies: [Dependency]
+}
+
+private enum SwiftTestError: Error {
+    case subcommandNotSupported(String)
+    case noUnitTestBundleFound
+}
+
+extension SwiftTestError: CustomStringConvertible {
+    var description: String {
+        switch self {
+        case .subcommandNotSupported(let subcommand):
+            return "'swift \(subcommand)' is not supported. 'swift test' is only supported"
+        case .noUnitTestBundleFound:
+            return "no unit test bundle found"
+        }
+    }
 }

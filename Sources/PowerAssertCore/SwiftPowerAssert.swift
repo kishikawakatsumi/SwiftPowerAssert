@@ -37,13 +37,8 @@ public final class SwiftPowerAssert {
     }
 
     private func transform(sourceFile: URL, verbose: Bool = false) throws -> String {
-        let sourceText: String
-        do {
-            let contents = try fileSystem.readFileContents(AbsolutePath(sourceFile.path))
-            sourceText = contents.asReadableString
-        } catch {
-            throw SwiftPowerAssertError.internalError("failed to read source file from: \(sourceFile)", error)
-        }
+        let contents = try fileSystem.readFileContents(AbsolutePath(sourceFile.path))
+        let sourceText = contents.asReadableString
 
         let arguments = buildArguments(source: sourceFile)
         let rawAST = try dumpAST(arguments: arguments)
@@ -83,7 +78,9 @@ public final class SwiftPowerAssert {
         case .terminated(let code) where code == 0:
             return output
         default:
-            throw SwiftPowerAssertError.buildFailed(output)
+            let command = process.arguments.map { $0.shellEscaped() }.joined(separator: " ")
+            let errorOutput = output.split(separator: "\n").prefix(1).joined(separator: "\n")
+            throw PowerAssertError.executingSubprocessFailed(command: command, output: try result.utf8Output() + errorOutput)
         }
     }
 
@@ -158,8 +155,8 @@ public enum SDK {
         case .terminated(let code) where code == 0:
             return output.trimmingCharacters(in: .whitespacesAndNewlines)
         default:
-            let error = try! result.utf8stderrOutput()
-            throw SwiftPowerAssertError.taskError(error)
+            throw PowerAssertError.executingSubprocessFailed(command: shell.arguments.joined(separator: " "),
+                                                             output: try result.utf8Output() + result.utf8stderrOutput())
         }
     }
 
@@ -172,8 +169,8 @@ public enum SDK {
         case .terminated(let code) where code == 0:
             return output.trimmingCharacters(in: .whitespacesAndNewlines)
         default:
-            let error = try! result.utf8stderrOutput()
-            throw SwiftPowerAssertError.taskError(error)
+            throw PowerAssertError.executingSubprocessFailed(command: shell.arguments.joined(separator: " "),
+                                                             output: try result.utf8Output() + result.utf8stderrOutput())
         }
     }
 }

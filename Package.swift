@@ -22,8 +22,8 @@ let package = Package(
             dependencies: ["Utility"]
         ),
         .testTarget(
-                name: "SwiftPowerAssertTests",
-                dependencies: ["PowerAssertCore"]
+            name: "SwiftPowerAssertTests",
+            dependencies: ["PowerAssertCore"]
         )
     ]
 )

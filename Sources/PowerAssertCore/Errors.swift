@@ -18,11 +18,17 @@
 
 import Foundation
 
-public enum SwiftPowerAssertError: Error {
-    case buildFailed(String)
-    case taskError(String)
-    case invalidArgument(String)
-    case noUnitTestBundle
-    case writeFailed(String, Error)
-    case internalError(String, Error)
+public enum PowerAssertError: Error {
+    case executingSubprocessFailed(command: String, output: String)
+}
+
+extension PowerAssertError: CustomStringConvertible {
+    public var description: String {
+        switch self {
+        case .executingSubprocessFailed(let command, let output):
+            var message = "failed to run the following command: '\(command)'"
+            if !output.isEmpty { message += " output: \(output)" }
+            return message
+        }
+    }
 }
