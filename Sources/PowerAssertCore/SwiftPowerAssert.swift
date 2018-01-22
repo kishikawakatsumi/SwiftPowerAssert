@@ -72,6 +72,7 @@ public final class SwiftPowerAssert {
     private func dumpAST(arguments: [String]) throws -> String {
         let process = Process(arguments: arguments)
         try! process.launch()
+        ProcessManager.default.add(process: process)
         let result = try! process.waitUntilExit()
         let output = try! result.utf8stderrOutput()
         switch result.exitStatus {
@@ -147,28 +148,30 @@ public enum SDK {
     }
 
     public func path() throws -> String {
-        let shell = Process(arguments: ["/usr/bin/xcrun", "--sdk", name, "--show-sdk-path"])
-        try! shell.launch()
-        let result = try! shell.waitUntilExit()
+        let process = Process(arguments: ["/usr/bin/xcrun", "--sdk", name, "--show-sdk-path"])
+        try! process.launch()
+        ProcessManager.default.add(process: process)
+        let result = try! process.waitUntilExit()
         let output = try! result.utf8Output()
         switch result.exitStatus {
         case .terminated(let code) where code == 0:
             return output.trimmingCharacters(in: .whitespacesAndNewlines)
         default:
-            throw PowerAssertError.executingSubprocessFailed(command: shell.arguments.joined(separator: " "), output: try result.utf8stderrOutput())
+            throw PowerAssertError.executingSubprocessFailed(command: process.arguments.joined(separator: " "), output: try result.utf8stderrOutput())
         }
     }
 
     public func version() throws -> String {
-        let shell = Process(arguments: ["defaults", "read", "\(try path())/SDKSettings.plist", "Version"])
-        try! shell.launch()
-        let result = try! shell.waitUntilExit()
+        let process = Process(arguments: ["defaults", "read", "\(try path())/SDKSettings.plist", "Version"])
+        try! process.launch()
+        ProcessManager.default.add(process: process)
+        let result = try! process.waitUntilExit()
         let output = try! result.utf8Output()
         switch result.exitStatus {
         case .terminated(let code) where code == 0:
             return output.trimmingCharacters(in: .whitespacesAndNewlines)
         default:
-            throw PowerAssertError.executingSubprocessFailed(command: shell.arguments.joined(separator: " "), output: try result.utf8stderrOutput())
+            throw PowerAssertError.executingSubprocessFailed(command: process.arguments.joined(separator: " "), output: try result.utf8stderrOutput())
         }
     }
 }

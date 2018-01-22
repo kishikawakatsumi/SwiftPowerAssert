@@ -21,6 +21,7 @@ import Basic
 import PowerAssertCore
 
 struct SwiftTestTool {
+
     func run(arguments: [String], verbose: Bool = false) throws {
         let options = try SwiftTestOptions(arguments)
 
@@ -199,6 +200,7 @@ private class SwiftTool {
     func run(_ arguments: [String], verbose: Bool = false) throws -> String {
         let process = Process(arguments: exec + [toolName] + options + arguments, redirectOutput: redirectOutput, verbose: verbose)
         try! process.launch()
+        ProcessManager.default.add(process: process)
         let result = try! process.waitUntilExit()
         let output = try! result.utf8Output()
         switch result.exitStatus {
