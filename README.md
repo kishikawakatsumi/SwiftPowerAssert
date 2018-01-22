@@ -39,13 +39,7 @@ Installation
 
 ```shell
 git clone https://github.com/kishikawakatsumi/SwiftPowerAssert
-```
-
-```shell
 cd SwiftPowerAssert
-```
-
-```shell
 swift build -c release
 ```
 
@@ -70,7 +64,16 @@ Replace `swift test...` command with `swift-power-assert test -Xswift test ...`
 /path/to/swift-power-assert test -Xswift test
 ```
 
-Note: SwiftPowerAssert injects instrument code into the family of `XCTAssert()` methods during tests. SwiftPowerAssert back up the source files before executing tests and restore automatically when the tests finished. However, the original files may not be restored due to an unexpected crash or something wrong. Please use it for the project under Git.
+__Note:__ SwiftPowerAssert injects instrument code into the family of `XCTAssert()` methods during tests. SwiftPowerAssert back up the source files before executing tests and restore automatically when the tests finished. However, the original files may not be restored due to an unexpected crash or something wrong. Please use it for the project under Git.
+
+#### Run Sample Project
+
+You can run the sample project with the following command:
+
+```
+swift build -c release
+(cd Fixtures/Atlas && ../../.build/release/swift-power-assert test -Xswift test)
+```
 
 Usage
 ---------------------------------------
