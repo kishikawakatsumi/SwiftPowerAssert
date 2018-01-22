@@ -29,6 +29,7 @@ struct SwiftPowerAssertTool {
 
         let binder = ArgumentBinder<Options>()
         binder.bind(parser: parser) { $0.subcommand = $1 }
+        binder.bind(option: parser.add(option: "--version", kind: Bool.self)) { (options, _) in options.subcommand = "version" }
         binder.bind(option: parser.add(option: "--verbose", kind: Bool.self, usage: "Show more debugging information")) { $0.verbose = $1 }
 
         let test = parser.add(subparser: "test", overview: "Run swift test with power assertion")

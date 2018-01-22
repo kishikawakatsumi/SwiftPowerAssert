@@ -36,6 +36,8 @@ do {
     case "transform":
         let command = TransformTool()
         try command.run(source: URL(fileURLWithPath: options.source), options: options.swiftcOptions, verbose: options.verbose)
+    case "version":
+        print("0.1.0")
     default:
         tool.parser.printUsage(on: stdoutStream)
     }
