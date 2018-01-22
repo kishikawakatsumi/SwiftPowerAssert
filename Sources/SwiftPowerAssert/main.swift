@@ -19,75 +19,26 @@
 import Foundation
 import Basic
 import Utility
+import POSIX
 import PowerAssertCore
 
 do {
-    let parser = ArgumentParser(commandName: "swift-power-assert", usage: "[options] subcommand [options]", overview: "Provide diagrammed assertions")
-    let verbose = parser.add(option: "--verbose", kind: Bool.self, usage: "Show more debugging information")
+    let tool = SwiftPowerAssertTool(arguments: Array(CommandLine.arguments.dropFirst()))
+    let options = tool.options
 
-    let test = parser.add(subparser: "test", overview: "Run swift test with power assertion")
-    let xswift = test.add(option: "-Xswift", kind: [String].self, strategy: .remaining, usage: "Arguments to pass to 'swift test' command")
-
-    let xctest = parser.add(subparser: "xctest", overview: "Run XCTest with power assertion.")
-    let xxcodebuild = xctest.add(option: "-Xxcodebuild", kind: [String].self, strategy: .remaining, usage: "Arguments to pass to 'xcodebuild' command")
-
-    let transform = parser.add(subparser: "transform", overview: "")
-    let source = transform.add(positional: "source", kind: String.self)
-    let options = xctest.add(option: "-options", kind: [String].self, strategy: .remaining)
-
-    let arguments = Array(CommandLine.arguments.dropFirst())
-    let result = try parser.parse(arguments)
-
-    let isVerbose = result.get(verbose) ?? false
-
-    switch result.subparser(parser) {
-    case "test"?:
-        if let arguments = result.get(xswift) {
-            let command = SwiftTestTool()
-            try command.run(arguments: arguments, verbose: isVerbose)
-        } else {
-            xctest.printUsage(on: stdoutStream)
-        }
-    case "xctest"?:
-        if let arguments = result.get(xxcodebuild) {
-            let command = XCTestTool()
-            try command.run(arguments: arguments, verbose: isVerbose)
-        } else {
-            xctest.printUsage(on: stdoutStream)
-        }
-    case "transform"?:
-        if let source = result.get(source) {
-            let options = result.get(options) ?? []
-            let command = TransformTool()
-            try command.run(source: URL(fileURLWithPath: source), options: options, verbose: isVerbose)
-        } else {
-            transform.printUsage(on: stdoutStream)
-        }
+    switch options.subcommand {
+    case "test":
+        let command = SwiftTestTool()
+        try command.run(arguments: options.swiftTestOptions, verbose: options.verbose)
+    case "xctest":
+        let command = XCTestTool()
+        try command.run(arguments: options.xcodebuildOptions, verbose: options.verbose)
+    case "transform":
+        let command = TransformTool()
+        try command.run(source: URL(fileURLWithPath: options.source), options: options.swiftcOptions, verbose: options.verbose)
     default:
-        parser.printUsage(on: stdoutStream)
+        tool.parser.printUsage(on: stdoutStream)
     }
-    exit(0)
-} catch ArgumentParserError.unknownOption(let option) {
-    print("swift-power-assert: error: unknown option \(option); use --help to list available options")
-} catch ArgumentParserError.invalidValue(let argument, let error) {
-    print("swift-power-assert: error: \(error) for argument \(argument); use --help to print usage")
-} catch ArgumentParserError.expectedValue(let option) {
-    print("swift-power-assert: error: option \(option) requires a value; provide a value using '\(option) <value>'")
-} catch ArgumentParserError.unexpectedArgument(let argument) {
-    print("swift-power-assert: error: unexpected argument \(argument); use --help to list available arguments")
-} catch ArgumentParserError.expectedArguments(_, let arguments) {
-    print("swift-power-assert: error: available actions are: \(arguments.joined(separator: ", "))")
-} catch SwiftPowerAssertError.invalidArgument(let description) {
-    print("swift-power-assert: error: \(description)")
-} catch SwiftPowerAssertError.noUnitTestBundle {
-    print("swift-power-assert: error: no unit test bundle found")
-} catch SwiftPowerAssertError.buildFailed(let description) {
-    print("swift-power-assert: error: \(description)")
-} catch SwiftPowerAssertError.taskError(let description) {
-    print("swift-power-assert: error: \(description)")
-} catch SwiftPowerAssertError.writeFailed(let description, let error) {
-    print("swift-power-assert: error: \(description): \(error.localizedDescription)")
-} catch SwiftPowerAssertError.internalError(let description, let error) {
-    print("swift-power-assert: error: \(description): \(error.localizedDescription)")
+} catch {
+    print("\(error)")
 }
-exit(1)

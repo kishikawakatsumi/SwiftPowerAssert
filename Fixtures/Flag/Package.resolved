@@ -1,0 +1,16 @@
+{
+  "object": {
+    "pins": [
+      {
+        "package": "Atlas",
+        "repositoryURL": "/Users/katsumi/Dropbox/Xcode Projects/SwiftPowerAssert/Fixtures/Atlas",
+        "state": {
+          "branch": null,
+          "revision": "581ea9979fb1d499124aafb7bed4f9f3229a7e80",
+          "version": "1.0.0"
+        }
+      }
+    ]
+  },
+  "version": 1
+}

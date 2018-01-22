@@ -36,15 +36,9 @@ class TestRunner {
     private func prepare(source: String) {
         try! source.write(toFile: env.sourceFilePath, atomically: true, encoding: .utf8)
         let processor = SwiftPowerAssert(buildOptions: env.parseOptions, dependencies: [])
-        do {
-            let transformed = try processor.processFile(input: URL(fileURLWithPath: env.sourceFilePath))
-            try! transformed.write(toFile: env.sourceFilePath, atomically: true, encoding: .utf8)
-        } catch SwiftPowerAssertError.buildFailed(let description) {
-            fatalError(description)
-        } catch {
-            fatalError(error.localizedDescription)
-        }
+        let transformed = try! processor.processFile(input: URL(fileURLWithPath: env.sourceFilePath))
 
+        try! transformed.write(toFile: env.sourceFilePath, atomically: true, encoding: .utf8)
         try! __Util.source.write(toFile: env.utilitiesFilePath, atomically: true, encoding: .utf8)
         let main = """
             #if os(macOS)

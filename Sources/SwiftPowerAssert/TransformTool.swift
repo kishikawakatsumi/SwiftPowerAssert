@@ -42,11 +42,8 @@ struct TransformTool {
         #endif
         let processor = SwiftPowerAssert(buildOptions: buildOptions)
         let transformed = try processor.processFile(input: source, verbose: verbose)
-        do {
-            try transformed.write(to: source, atomically: true, encoding: .utf8)
-            try __Util.source.write(to: source.deletingLastPathComponent().appendingPathComponent("Utilities.swift"), atomically: true, encoding: .utf8)
-        } catch {
-            throw SwiftPowerAssertError.writeFailed("failed to transform file", error)
-        }
+        
+        try transformed.write(to: source, atomically: true, encoding: .utf8)
+        try __Util.source.write(to: source.deletingLastPathComponent().appendingPathComponent("Utilities.swift"), atomically: true, encoding: .utf8)
     }
 }
