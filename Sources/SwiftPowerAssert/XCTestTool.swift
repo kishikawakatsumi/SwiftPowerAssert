@@ -26,7 +26,7 @@ struct XCTestTool {
 
         print("Reading project settings...")
         let xcodebuild = Xcodebuild()
-        let rawBuildSettings = try xcodebuild.showBuildSettings(arguments: xcodebuildOptions.rawOptions)
+        let rawBuildSettings = try xcodebuild.showBuildSettings(arguments: xcodebuildOptions.rawOptions, verbose: verbose)
 
         let buildSettings = BuildSettings.parse(rawBuildSettings)
         guard let targetBuildSettings = buildSettings.values.filter({ $0.settings["PRODUCT_TYPE"] == "com.apple.product-type.bundle.unit-test" }).first else {
@@ -34,7 +34,7 @@ struct XCTestTool {
         }
 
         print("Building dependencies...")
-        let log = try xcodebuild.build(arguments: xcodebuildOptions.options)
+        let log = try xcodebuild.build(arguments: xcodebuildOptions.options, verbose: verbose)
         var swiftOptions = constructSwiftOptions(xcodebuildLog: log)
 
         let bridgingHeaderPath: URL?
@@ -79,7 +79,7 @@ struct XCTestTool {
         }
 
         print("Testing \(targetBuildSettings.target) ...")
-        try xcodebuild.invoke(arguments: xcodebuildOptions.rawOptions)
+        try xcodebuild.invoke(arguments: xcodebuildOptions.rawOptions, verbose: verbose)
     }
 
     private func constructSwiftOptions(xcodebuildLog log: String) -> [String] {
@@ -179,8 +179,8 @@ struct XcodebuildOptions {
 private struct Xcodebuild {
     let exec = ["/usr/bin/xcrun", "xcodebuild"]
 
-    func build(arguments: [String]) throws -> String {
-        let command = Process(arguments: exec + ["clean", "build"] + arguments)
+    func build(arguments: [String], verbose: Bool = false) throws -> String {
+        let command = Process(arguments: exec + ["clean", "build"] + arguments, verbose: verbose)
         try! command.launch()
         let result = try! command.waitUntilExit()
         let output = try! result.utf8Output()
@@ -188,13 +188,12 @@ private struct Xcodebuild {
         case .terminated(let code) where code == 0:
             return output
         default:
-            throw PowerAssertError.executingSubprocessFailed(command: command.arguments.joined(separator: " "),
-                                                                  output: try result.utf8Output() + result.utf8stderrOutput())
+            throw PowerAssertError.executingSubprocessFailed(command: command.arguments.joined(separator: " "), output: try result.utf8stderrOutput())
         }
     }
 
-    func showBuildSettings(arguments: [String]) throws -> String {
-        let command = Process(arguments: exec + arguments + ["-showBuildSettings"])
+    func showBuildSettings(arguments: [String], verbose: Bool = false) throws -> String {
+        let command = Process(arguments: exec + arguments + ["-showBuildSettings"], verbose: verbose)
         try! command.launch()
         let result = try! command.waitUntilExit()
         let output = try! result.utf8Output()
@@ -202,21 +201,19 @@ private struct Xcodebuild {
         case .terminated(let code) where code == 0:
             return output
         default:
-            throw PowerAssertError.executingSubprocessFailed(command: command.arguments.joined(separator: " "),
-                                                                  output: try result.utf8Output() + result.utf8stderrOutput())
+            throw PowerAssertError.executingSubprocessFailed(command: command.arguments.joined(separator: " "), output: try result.utf8stderrOutput())
         }
     }
 
-    func invoke(arguments: [String]) throws {
-        let command = Process(arguments: exec + arguments, redirectOutput: false)
+    func invoke(arguments: [String], verbose: Bool = false) throws {
+        let command = Process(arguments: exec + arguments, redirectOutput: false, verbose: verbose)
         try! command.launch()
         let result = try! command.waitUntilExit()
         switch result.exitStatus {
         case .terminated(let code) where code == 0:
             return
         default:
-            throw PowerAssertError.executingSubprocessFailed(command: command.arguments.joined(separator: " "),
-                                                             output: try result.utf8Output() + result.utf8stderrOutput())
+            throw PowerAssertError.executingSubprocessFailed(command: command.arguments.joined(separator: " "), output: try result.utf8stderrOutput())
         }
     }
 }
