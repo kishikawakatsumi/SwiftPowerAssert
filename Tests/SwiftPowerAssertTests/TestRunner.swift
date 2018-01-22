@@ -53,6 +53,7 @@ class TestRunner {
     private func compile() {
         let process = Process(arguments: env.execOptions)
         try! process.launch()
+        ProcessManager.default.add(process: process)
         let result = try! process.waitUntilExit()
         if case .terminated(let code) = result.exitStatus, code != 0 {
             fatalError(try! result.utf8stderrOutput())
@@ -62,12 +63,11 @@ class TestRunner {
     private func execute() -> String {
         let process = Process(arguments: [env.executablePath])
         try! process.launch()
-
+        ProcessManager.default.add(process: process)
         let result = try! process.waitUntilExit()
         if case .terminated(let code) = result.exitStatus, code != 0 {
             fatalError(try! result.utf8stderrOutput())
         }
-
         return try! result.utf8Output()
     }
 }

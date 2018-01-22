@@ -182,6 +182,7 @@ private struct Xcodebuild {
     func build(arguments: [String], verbose: Bool = false) throws -> String {
         let process = Process(arguments: exec + ["clean", "build"] + arguments, verbose: verbose)
         try! process.launch()
+        ProcessManager.default.add(process: process)
         let result = try! process.waitUntilExit()
         let output = try! result.utf8Output()
         switch result.exitStatus {
@@ -197,6 +198,7 @@ private struct Xcodebuild {
     func showBuildSettings(arguments: [String], verbose: Bool = false) throws -> String {
         let process = Process(arguments: exec + arguments + ["-showBuildSettings"], verbose: verbose)
         try! process.launch()
+        ProcessManager.default.add(process: process)
         let result = try! process.waitUntilExit()
         let output = try! result.utf8Output()
         switch result.exitStatus {
@@ -212,6 +214,7 @@ private struct Xcodebuild {
     func invoke(arguments: [String], verbose: Bool = false) throws {
         let process = Process(arguments: exec + arguments, redirectOutput: false, verbose: verbose)
         try! process.launch()
+        ProcessManager.default.add(process: process)
         let result = try! process.waitUntilExit()
         switch result.exitStatus {
         case .terminated(let code) where code == 0:
@@ -264,7 +267,7 @@ private struct BuildSettings {
     }
 
     fileprivate func sources() -> [URL] {
-        var sources = [Foundation.URL]()
+        var sources = [URL]()
 
         let projectFilePath = settings["PROJECT_FILE_PATH"]!
         let pbxprojData = try! Data(contentsOf: URL(fileURLWithPath: projectFilePath).appendingPathComponent("project.pbxproj"))

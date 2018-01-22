@@ -119,6 +119,7 @@ class ParserTests: XCTestCase {
 
         let process = Process(arguments: arguments)
         try! process.launch()
+        ProcessManager.default.add(process: process)
         let result = try! process.waitUntilExit()
         let rawAST = try! result.utf8stderrOutput()
 
