@@ -20,11 +20,11 @@ import Foundation
 import Utility
 import POSIX
 
-public struct SwiftPowerAssertTool {
-    public let parser: ArgumentParser
-    public let options: Options
+struct SwiftPowerAssertTool {
+    let parser: ArgumentParser
+    let options: Options
 
-    public init(arguments: [String]) {
+    init(arguments: [String]) {
         parser = ArgumentParser(commandName: "swift-power-assert", usage: "[options] subcommand [options]", overview: "Provide diagrammed assertions")
 
         let binder = ArgumentBinder<Options>()
@@ -54,7 +54,7 @@ public struct SwiftPowerAssertTool {
     }
 }
 
-public struct Options {
+struct Options {
     var verbose = false
     var subcommand = ""
 

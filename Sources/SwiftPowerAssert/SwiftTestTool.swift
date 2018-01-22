@@ -197,16 +197,17 @@ private class SwiftTool {
     }
 
     func run(_ arguments: [String], verbose: Bool = false) throws -> String {
-        let command = Process(arguments: exec + [toolName] + options + arguments, redirectOutput: redirectOutput, verbose: verbose)
-        try! command.launch()
-        let result = try! command.waitUntilExit()
+        let process = Process(arguments: exec + [toolName] + options + arguments, redirectOutput: redirectOutput, verbose: verbose)
+        try! process.launch()
+        let result = try! process.waitUntilExit()
         let output = try! result.utf8Output()
         switch result.exitStatus {
         case .terminated(let code) where code == 0:
             return output
         default:
             let errorOutput = try result.utf8stderrOutput()
-            throw PowerAssertError.executingSubprocessFailed(command: command.arguments.joined(separator: " "), output: errorOutput)
+            let command = process.arguments.map { $0.shellEscaped() }.joined(separator: " ")
+            throw PowerAssertError.executingSubprocessFailed(command: command, output: errorOutput)
         }
     }
 }

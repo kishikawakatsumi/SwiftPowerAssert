@@ -155,8 +155,7 @@ public enum SDK {
         case .terminated(let code) where code == 0:
             return output.trimmingCharacters(in: .whitespacesAndNewlines)
         default:
-            throw PowerAssertError.executingSubprocessFailed(command: shell.arguments.joined(separator: " "),
-                                                             output: try result.utf8Output() + result.utf8stderrOutput())
+            throw PowerAssertError.executingSubprocessFailed(command: shell.arguments.joined(separator: " "), output: try result.utf8stderrOutput())
         }
     }
 
@@ -169,8 +168,7 @@ public enum SDK {
         case .terminated(let code) where code == 0:
             return output.trimmingCharacters(in: .whitespacesAndNewlines)
         default:
-            throw PowerAssertError.executingSubprocessFailed(command: shell.arguments.joined(separator: " "),
-                                                             output: try result.utf8Output() + result.utf8stderrOutput())
+            throw PowerAssertError.executingSubprocessFailed(command: shell.arguments.joined(separator: " "), output: try result.utf8stderrOutput())
         }
     }
 }

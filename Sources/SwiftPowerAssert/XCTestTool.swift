@@ -180,40 +180,46 @@ private struct Xcodebuild {
     let exec = ["/usr/bin/xcrun", "xcodebuild"]
 
     func build(arguments: [String], verbose: Bool = false) throws -> String {
-        let command = Process(arguments: exec + ["clean", "build"] + arguments, verbose: verbose)
-        try! command.launch()
-        let result = try! command.waitUntilExit()
+        let process = Process(arguments: exec + ["clean", "build"] + arguments, verbose: verbose)
+        try! process.launch()
+        let result = try! process.waitUntilExit()
         let output = try! result.utf8Output()
         switch result.exitStatus {
         case .terminated(let code) where code == 0:
             return output
         default:
-            throw PowerAssertError.executingSubprocessFailed(command: command.arguments.joined(separator: " "), output: try result.utf8stderrOutput())
+            let errorOutput = try result.utf8stderrOutput()
+            let command = process.arguments.map { $0.shellEscaped() }.joined(separator: " ")
+            throw PowerAssertError.executingSubprocessFailed(command: command, output: errorOutput)
         }
     }
 
     func showBuildSettings(arguments: [String], verbose: Bool = false) throws -> String {
-        let command = Process(arguments: exec + arguments + ["-showBuildSettings"], verbose: verbose)
-        try! command.launch()
-        let result = try! command.waitUntilExit()
+        let process = Process(arguments: exec + arguments + ["-showBuildSettings"], verbose: verbose)
+        try! process.launch()
+        let result = try! process.waitUntilExit()
         let output = try! result.utf8Output()
         switch result.exitStatus {
         case .terminated(let code) where code == 0:
             return output
         default:
-            throw PowerAssertError.executingSubprocessFailed(command: command.arguments.joined(separator: " "), output: try result.utf8stderrOutput())
+            let errorOutput = try result.utf8stderrOutput()
+            let command = process.arguments.map { $0.shellEscaped() }.joined(separator: " ")
+            throw PowerAssertError.executingSubprocessFailed(command: command, output: errorOutput)
         }
     }
 
     func invoke(arguments: [String], verbose: Bool = false) throws {
-        let command = Process(arguments: exec + arguments, redirectOutput: false, verbose: verbose)
-        try! command.launch()
-        let result = try! command.waitUntilExit()
+        let process = Process(arguments: exec + arguments, redirectOutput: false, verbose: verbose)
+        try! process.launch()
+        let result = try! process.waitUntilExit()
         switch result.exitStatus {
         case .terminated(let code) where code == 0:
             return
         default:
-            throw PowerAssertError.executingSubprocessFailed(command: command.arguments.joined(separator: " "), output: try result.utf8stderrOutput())
+            let errorOutput = try result.utf8stderrOutput()
+            let command = process.arguments.map { $0.shellEscaped() }.joined(separator: " ")
+            throw PowerAssertError.executingSubprocessFailed(command: command, output: errorOutput)
         }
     }
 }
