@@ -162,7 +162,7 @@ public enum SDK {
     }
 
     public func version() throws -> String {
-        let process = Process(arguments: ["defaults", "read", "\(try path())/SDKSettings.plist", "Version"])
+        let process = Process(arguments: ["/usr/bin/xcrun", "--sdk", name, "--show-sdk-version"])
         try! process.launch()
         ProcessManager.default.add(process: process)
         let result = try! process.waitUntilExit()
