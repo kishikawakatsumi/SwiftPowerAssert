@@ -38,9 +38,9 @@ Installation
 ---------------------------------------
 
 ```shell
-git clone https://github.com/kishikawakatsumi/SwiftPowerAssert
-cd SwiftPowerAssert
-swift build -c release
+$ git clone https://github.com/kishikawakatsumi/SwiftPowerAssert
+$ cd SwiftPowerAssert
+$ swift build -c release
 ```
 
 Copy the file (`.build/release/swift-power-assert`) to your binary location.
@@ -53,7 +53,7 @@ Getting Started
 Replace `xcodebuild test...` command with `swift-power-assert xctest -Xxcodebuild test ...`
 
 ```shell
-/path/to/swift-power-assert xctest -Xxcodebuild test -scheme Atlas-Package
+$ /path/to/swift-power-assert xctest -Xxcodebuild test -scheme Atlas-Package
 ```
 
 ### For swift test
@@ -61,7 +61,7 @@ Replace `xcodebuild test...` command with `swift-power-assert xctest -Xxcodebuil
 Replace `swift test...` command with `swift-power-assert test -Xswift test ...`
 
 ```shell
-/path/to/swift-power-assert test -Xswift test
+$ /path/to/swift-power-assert test -Xswift test
 ```
 
 __Note:__ SwiftPowerAssert injects instrument code into the family of `XCTAssert()` methods during tests. SwiftPowerAssert back up the source files before executing tests and restore automatically when the tests finished. However, the original files may not be restored due to an unexpected crash or something wrong. Please use it for the project under Git.
@@ -71,8 +71,8 @@ __Note:__ SwiftPowerAssert injects instrument code into the family of `XCTAssert
 You can run the sample project with the following command:
 
 ```
-swift build -c release
-(cd Fixtures/Atlas && ../../.build/release/swift-power-assert test -Xswift test)
+$ swift build -c release
+$ (cd Fixtures/Atlas && ../../.build/release/swift-power-assert test -Xswift test)
 ```
 
 Usage
@@ -93,22 +93,23 @@ SUBCOMMANDS:
 You can pass any `xcodebuild` or `swift` options after `-Xxcodebuild` or `-Xswift`.
 
 ```shell
-/path/to/swift-power-assert xctest -Xxcodebuild test -project Atlas.xcodeproj -scheme Atlas-Package \
- -sdk iphonesimulator -destination "name=iPhone X,OS=11.2"
+$ /path/to/swift-power-assert xctest -Xxcodebuild test -project Atlas.xcodeproj \
+  -scheme Atlas-Package -sdk iphonesimulator \
+  -destination "name=iPhone X,OS=11.2"
 ```
 
 ```shell
-/path/to/swift-power-assert test -Xswift test -c release -Xswiftc -enable-testing
+$ /path/to/swift-power-assert test -Xswift test -c release -Xswiftc -enable-testing
 ```
 
 Nothing happens? If the test succeeds, nothing is output. If you always want to see rich ASCII art, enable the `--verbose` option. always output a diagram regardless of the success or failure of assertions.
 
 ```shell
-/path/to/swift-power-assert --verbose xctest -Xxcodebuild test -project Atlas.xcodeproj -scheme Atlas-Package
+$ /path/to/swift-power-assert --verbose xctest -Xxcodebuild test -project Atlas.xcodeproj -scheme Atlas-Package
 ```
 
 ```shell
-/path/to/swift-power-assert --verbose test -Xswift test
+$ /path/to/swift-power-assert --verbose test -Xswift test
 ```
 
 Examples
