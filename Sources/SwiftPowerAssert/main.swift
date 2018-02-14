@@ -18,8 +18,6 @@
 
 import Foundation
 import Basic
-import Utility
-import POSIX
 import PowerAssertCore
 
 do {
