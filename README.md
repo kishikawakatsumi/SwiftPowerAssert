@@ -1,7 +1,9 @@
 # Power Assertions for Swift
 
-[![Build Status](https://www.bitrise.io/app/05d5545de36d77a7/status.svg?token=2KUMgdXPKlzEiMPBRZzugg&branch=master)](https://www.bitrise.io/app/05d5545de36d77a7)
-[![codecov](https://codecov.io/gh/kishikawakatsumi/SwiftPowerAssert/branch/master/graph/badge.svg)](https://codecov.io/gh/kishikawakatsumi/SwiftPowerAssert)
+**This project has moved to a new repository, find it here: [kishikawakatsumi
+/
+swift-power-assert](https://github.com/kishikawakatsumi/swift-power-assert)**
+
 
 Power assertions (a.k.a. diagrammed assertions) augment your assertion failures with information about values produced during the evaluation of a condition, and presents them in an easily digestible form.
 Power assertions are a popular feature of [Spock](https://github.com/spockframework/spock) (and later the whole [Groovy](https://github.com/apache/groovy) language independently of Spock),
